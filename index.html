@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guitar Hero · Tom's practice notebook</title>
+  <meta name="description" content="Tom's guitar practice notebook: daily lessons, tracker, goals and recordings.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1C19 1 23 5 23 10C23 17 16 23 12 23C8 23 1 17 1 10C1 5 5 1 12 1Z' fill='%23ff6b4a' stroke='%2323305a' stroke-width='1.5'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Kalam:wght@400;700&family=Courier+Prime&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=1">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="#/">
+      <svg viewBox="0 0 24 24" class="brand-pick" aria-hidden="true"><path d="M12 1C19 1 23 5 23 10C23 17 16 23 12 23C8 23 1 17 1 10C1 5 5 1 12 1Z"/></svg>
+      Guitar Hero<small>Tom's practice notebook</small>
+    </a>
+    <button id="sync" class="sync" type="button" data-status="off"><i></i><span>local only</span></button>
+    <nav aria-label="Main">
+      <a href="#/">Today</a>
+      <a href="#/tracker">Tracker</a>
+      <a href="#/goals">Goals</a>
+      <a href="#/tapes">Tapes</a>
+      <a href="#/settings">Settings</a>
+    </nav>
+  </header>
+  <main id="view" tabindex="-1"></main>
+  <footer class="foot">Keep it fun. Free play is always allowed.</footer>
+  <noscript><p class="page card">This notebook needs JavaScript switched on.</p></noscript>
+  <script type="module" src="js/app.js?v=1"></script>
+</body>
+</html>
