@@ -1,6 +1,6 @@
 // State lives in localStorage (works offline) and syncs to data.json in a private GitHub repo.
 // Recordings are cached in IndexedDB and uploaded to recordings/ in the same repo.
-import { today } from "./util.js?v=2";
+import { today } from "./util.js?v=3";
 
 const STATE_KEY = "gh.state.v1";
 const SETTINGS_KEY = "gh.settings.v1";

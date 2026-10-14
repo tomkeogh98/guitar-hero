@@ -1,10 +1,10 @@
-import { AREAS, BLOCKS, getLesson, lessonLabel } from "./curriculum.js?v=2";
-import { greet } from "./greetings.js?v=2";
-import { GOALS, TIERS, context, currentTier, focusGoals, isDone, recordBestStreak, weakestArea } from "./goals.js?v=2";
-import { REASONS, dayStatus, excuseOn, nudgeCheck, practisedOn, sessionsOn, shiftTargets, streak, weekSummary } from "./schedule.js?v=2";
-import { configured, exportJSON, getAudio, importJSON, putAudio, saveSettings, stamp, store, syncNow, testConnection, update } from "./store.js?v=2";
-import { Metronome, chime, extFor, recordingSupported, startRecording } from "./audio.js?v=2";
-import { addDays, daysBetween, dayName, esc, fmt, monthName, mondayOf, parse, pickRandom, prettyDate, reducedMotion, shortDay, today, uid, weekday } from "./util.js?v=2";
+import { AREAS, BLOCKS, getLesson, lessonLabel } from "./curriculum.js?v=3";
+import { greet } from "./greetings.js?v=3";
+import { GOALS, TIERS, context, currentTier, focusGoals, isDone, recordBestStreak, weakestArea } from "./goals.js?v=3";
+import { REASONS, dayStatus, excuseOn, nudgeCheck, practisedOn, sessionsOn, shiftTargets, streak, weekSummary } from "./schedule.js?v=3";
+import { configured, exportJSON, getAudio, importJSON, putAudio, saveSettings, stamp, store, syncNow, testConnection, update } from "./store.js?v=3";
+import { Metronome, chime, extFor, recordingSupported, startRecording } from "./audio.js?v=3";
+import { addDays, daysBetween, dayName, esc, fmt, monthName, mondayOf, parse, pickRandom, prettyDate, reducedMotion, shortDay, today, uid, weekday } from "./util.js?v=3";
 
 const view = document.getElementById("view");
 const $ = (sel, root = view) => root.querySelector(sel);
@@ -148,8 +148,10 @@ function renderToday() {
 
   view.innerHTML = `
     <section class="hero">
-      <p class="date">${prettyDate(now)}</p>
-      <h1 class="greet">${esc(greetingLine)}</h1>${squiggle}
+      <div class="hero-text">
+        <p class="date">${prettyDate(now)}</p>
+        <h1 class="greet">${esc(greetingLine)}</h1>${squiggle}
+      </div>
       <div class="stickers">
         <span class="sticker streak" title="Practice streak">${pickSvg()}<b>${str}</b><small>day streak</small></span>
         <span class="sticker week"><b>${wk.practised}/${Math.max(wk.required, 1)}</b><small>this week</small></span>
@@ -157,8 +159,9 @@ function renderToday() {
       </div>
     </section>
     ${nudge ? `<aside class="sticky pink nudge" role="status"><b>A warm nudge</b><p>${esc(pickRandom(NUDGES[nudge.kind]).replace("{n}", nudge.count).replace("{s}", nudge.count === 1 ? "" : "s"))}</p></aside>` : ""}
-    ${planCard}
-    <section class="split">
+    <div class="cols today-grid">
+    <div class="col-main">${planCard}</div>
+    <aside class="col-side">
       <div class="card">
         <h3>This week</h3>
         <div class="strip">${strip}</div>
@@ -169,7 +172,8 @@ function renderToday() {
         ${goals.map((g) => `<div class="sticky ${g.tier % 2 ? "blue" : "yellow"} mini-goal">${esc(g.title)}</div>`).join("") || "<p>Everything ticked off. Legend.</p>"}
         <a class="small" href="#/goals">All goals →</a>
       </div>
-    </section>`;
+    </aside>
+    </div>`;
 }
 
 // ---------- LESSON ----------
@@ -252,16 +256,16 @@ function renderLesson() {
   view.innerHTML = `<section class="page card lesson">${head}
     <h2>Journal</h2>
     <p>Quick notes for future Tom. Two minutes, tops.</p>
-    <form id="journal">
+    <form id="journal"><div class="journal-grid"><div>
       <fieldset class="moods"><legend>How did it feel overall?</legend>
         ${MOODS.map((m, i) => `<label class="mood"><input type="radio" name="mood" value="${i}" ${i === 3 ? "checked" : ""}>${face(i)}<span>${m}</span></label>`).join("")}
       </fieldset>
       <fieldset class="ratings"><legend>How solid did each area feel? (1 = shaky, 5 = nailed it)</legend>
         ${L.areas.map((a) => `<div class="rate"><span>${AREAS[a]}</span>${[1, 2, 3, 4, 5].map((v) => `<label><input type="radio" name="r-${a}" value="${v}" ${v === 3 ? "checked" : ""}><b>${v}</b></label>`).join("")}</div>`).join("")}
-      </fieldset>
+      </fieldset></div><div>
       <label class="field">How did it go?<textarea name="how" rows="3" placeholder="e.g. Changes were smoother, but the bend was flat…"></textarea></label>
       <label class="field">What felt hard?<textarea name="hard" rows="2"></textarea></label>
-      <label class="field">One small win<input name="win" placeholder="e.g. Got through the song without stopping!"></label>
+      <label class="field">One small win<input name="win" placeholder="e.g. Got through the song without stopping!"></label></div></div>
       <div class="row nav-row"><button type="button" class="btn ghost" data-act="prev">← Back</button><button class="btn big" type="submit">Save today's page ✓</button></div>
     </form>
   </section>`;
@@ -389,6 +393,7 @@ let selected = null;
 function renderTracker() {
   const s = store.state, now = today();
   if (!cal) { const d = parse(now); cal = { y: d.getFullYear(), m: d.getMonth() }; }
+  selected ||= now;
   const first = fmt(new Date(cal.y, cal.m, 1));
   const gridStart = mondayOf(first);
   const days = [];
@@ -420,7 +425,8 @@ function renderTracker() {
   }
 
   view.innerHTML = `
-    <section class="page card">
+    <div class="cols tracker-grid">
+    <section class="page card cal-card">
       <div class="cal-head">
         <button class="btn small ghost" data-act="month" data-d="-1" aria-label="Previous month">←</button>
         <h1>${monthName(cal.m)} <small>${cal.y}</small></h1>
@@ -434,9 +440,10 @@ function renderTracker() {
         <span><i class="done"></i>Practised</span><span><i class="missed"></i>Missed</span><span><i class="off"></i>Not scheduled</span>
         <span><i class="excused"></i>Excused (S sick · H holiday · E emergency)</span><span><i class="planned"></i>Coming up</span>
       </div>
-      <div id="day-panel">${selected ? dayPanel(selected) : `<p class="muted small">Tap a day to move a lesson, log a reason, or see what you played.</p>`}</div>
+      <p class="muted small">Tap a day to move a lesson, log a reason, or see what you played.</p>
     </section>
-    <section class="split">
+    <aside class="col-side">
+      <div class="card" id="day-panel">${dayPanel(selected)}</div>
       <div class="card stats">
         <h3>The numbers</h3>
         <div class="statgrid">
@@ -451,7 +458,8 @@ function renderTracker() {
         <ul class="tallies">${weeks.join("") || "<li class='muted'>Nothing yet. Your first tally mark is one lesson away.</li>"}</ul>
         <p class="small muted">Five a week minimum. Sick, holiday and emergency days lower the target.</p>
       </div>
-    </section>`;
+    </aside>
+    </div>`;
 }
 
 function dayPanel(d) {
@@ -497,6 +505,7 @@ function renderGoals() {
       ${done && s.goals[g.id]?.date ? `<small class="muted">${prettyDate(s.goals[g.id].date)}</small>` : ""}</li>`;
   };
   view.innerHTML = `
+    <div class="goals-top">
     <section class="page card level">
       <div class="tape"></div>
       <p class="tag">Current level</p>
@@ -505,15 +514,16 @@ function renderGoals() {
         <div class="pencil-bar"><i style="width:${Math.round(100 * (Math.min(ctx.lessons / next.from, 1) + Math.min(tierDone / 2, 1)) / 2)}%"></i></div>`
         : "<p>Top of the notebook. Time to write the next one.</p>"}
     </section>
-    ${weak ? `<aside class="sticky blue"><b>Your journal says ${esc(weak.label.toLowerCase())} feels shakiest</b> (averaging ${weak.avg.toFixed(1)}/5).<p>${esc(weak.tip)}</p></aside>` : ""}
+    ${weak ? `<aside class="sticky blue weak"><b>Your journal says ${esc(weak.label.toLowerCase())} feels shakiest</b> (averaging ${weak.avg.toFixed(1)}/5).<p>${esc(weak.tip)}</p></aside>` : ""}
+    </div>
     <section class="card">
       <h2>Focus on these next</h2>
       <div class="focus">${focus.map((g, i) => `<div class="sticky ${["yellow", "pink", "green"][i]}"><p>${esc(g.title)}</p><small>${AREAS[g.area]}</small>${g.auto ? "" : `<button class="btn small" data-act="goal-done" data-id="${g.id}">Done it!</button>`}</div>`).join("") || "<p>All clear. Pick your own next challenge!</p>"}</div>
     </section>
-    ${TIERS.map((t, i) => `<section class="card tier ${i > tier ? "future" : ""}">
+    <div class="tiers">${TIERS.map((t, i) => `<section class="card tier ${i > tier ? "future" : ""}">
       <h3>${t.name} ${i > tier ? `<small class="muted">unlocks around lesson ${t.from}</small>` : i === tier ? `<small class="hl">you are here</small>` : ""}</h3>
       <ul class="goal-list">${GOALS.filter((g) => g.tier === i).map(goalItem).join("")}</ul>
-    </section>`).join("")}`;
+    </section>`).join("")}</div>`;
 }
 
 // ---------- TAPES ----------
@@ -557,6 +567,7 @@ async function playTape(btn) {
 function renderSettings() {
   const st = store.settings;
   view.innerHTML = `
+    <div class="cols settings-grid"><div class="col-main">
     <section class="page card">
       <div class="tape"></div>
       <h1>Settings</h1>
@@ -575,7 +586,7 @@ function renderSettings() {
         <div class="row"><button class="btn">Save &amp; test</button><button type="button" class="btn ghost" data-act="sync">Sync now</button>${st.token ? `<button type="button" class="btn ghost" data-act="disconnect">Forget token</button>` : ""}</div>
         <p class="sync-msg small" data-status="${store.sync.status}">${configured() ? esc(store.sync.message || "") + (store.sync.lastSynced ? ` · last synced ${store.sync.lastSynced.toLocaleTimeString()}` : "") : "Not connected: everything stays on this device for now."}</p>
       </form>
-    </section>
+    </section></div><div class="col-side">
     <section class="card">
       <h2>Warm nudges by email</h2>
       <p class="small">The data repo checks your log every weekday evening. If you're missing lessons or logging lots of excused days, it opens an issue that @mentions you, so GitHub sends you a notification and an email. Close the issue once you've read it.</p>
@@ -589,7 +600,7 @@ function renderSettings() {
       <h2>Backup</h2>
       <div class="row"><button class="btn ghost" data-act="export">Download backup (.json)</button><label class="btn ghost">Restore from backup<input type="file" accept="application/json" data-act="import" hidden></label></div>
       <p class="small muted">Backups hold your log and journal. Recordings live in the data repo and this browser.</p>
-    </section>`;
+    </section></div></div>`;
 }
 
 // ---------- routing & events ----------
