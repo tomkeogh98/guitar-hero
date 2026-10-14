@@ -1,6 +1,6 @@
 // A different hello every visit, picked from whichever pools fit the moment,
 // never repeating one of the last few shown.
-import { pickRandom } from "./util.js?v=1";
+import { pickRandom } from "./util.js?v=2";
 
 const HISTORY_KEY = "gh.greetings.v1";
 

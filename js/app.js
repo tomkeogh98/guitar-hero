@@ -1,10 +1,10 @@
-import { AREAS, BLOCKS, getLesson, lessonLabel } from "./curriculum.js?v=1";
-import { greet } from "./greetings.js?v=1";
-import { GOALS, TIERS, context, currentTier, focusGoals, isDone, recordBestStreak, weakestArea } from "./goals.js?v=1";
-import { REASONS, dayStatus, excuseOn, nudgeCheck, practisedOn, sessionsOn, shiftTargets, streak, weekSummary } from "./schedule.js?v=1";
-import { configured, exportJSON, getAudio, importJSON, putAudio, saveSettings, stamp, store, syncNow, testConnection, update } from "./store.js?v=1";
-import { Metronome, chime, extFor, recordingSupported, startRecording } from "./audio.js?v=1";
-import { addDays, daysBetween, dayName, esc, fmt, monthName, mondayOf, parse, pickRandom, prettyDate, reducedMotion, shortDay, today, uid, weekday } from "./util.js?v=1";
+import { AREAS, BLOCKS, getLesson, lessonLabel } from "./curriculum.js?v=2";
+import { greet } from "./greetings.js?v=2";
+import { GOALS, TIERS, context, currentTier, focusGoals, isDone, recordBestStreak, weakestArea } from "./goals.js?v=2";
+import { REASONS, dayStatus, excuseOn, nudgeCheck, practisedOn, sessionsOn, shiftTargets, streak, weekSummary } from "./schedule.js?v=2";
+import { configured, exportJSON, getAudio, importJSON, putAudio, saveSettings, stamp, store, syncNow, testConnection, update } from "./store.js?v=2";
+import { Metronome, chime, extFor, recordingSupported, startRecording } from "./audio.js?v=2";
+import { addDays, daysBetween, dayName, esc, fmt, monthName, mondayOf, parse, pickRandom, prettyDate, reducedMotion, shortDay, today, uid, weekday } from "./util.js?v=2";
 
 const view = document.getElementById("view");
 const $ = (sel, root = view) => root.querySelector(sel);

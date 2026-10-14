@@ -1,6 +1,6 @@
 // State lives in localStorage (works offline) and syncs to data.json in a private GitHub repo.
 // Recordings are cached in IndexedDB and uploaded to recordings/ in the same repo.
-import { today } from "./util.js?v=1";
+import { today } from "./util.js?v=2";
 
 const STATE_KEY = "gh.state.v1";
 const SETTINGS_KEY = "gh.settings.v1";
@@ -33,7 +33,13 @@ export function update(mutator) {
 }
 export function stamp(rec) { return Object.assign(rec, { updatedAt: Date.now() }); }
 
+// Tokens and repo names are plain ASCII; pasting (especially on phones) can drag in
+// spaces, line breaks or invisible characters that break the request.
+const clean = (v) => String(v).replace(/[^\x21-\x7e]/g, "");
+
 export function saveSettings(patch) {
+  if ("token" in patch) patch.token = clean(patch.token);
+  if ("repo" in patch) patch.repo = clean(patch.repo).replace(/^https:\/\/github\.com\//, "").replace(/\.git$|\/$/g, "");
   Object.assign(store.settings, patch);
   writeJSON(SETTINGS_KEY, store.settings);
   store.emit();
@@ -97,8 +103,10 @@ export async function getAudio(name) {
 // ---------- GitHub sync ----------
 export const configured = () => Boolean(store.settings.token && store.settings.repo);
 
-function gh(path, opts = {}) {
-  return fetch(`https://api.github.com/repos/${store.settings.repo}/${path}`, {
+async function gh(path, opts = {}) {
+  const url = `https://api.github.com/repos/${store.settings.repo}${path ? `/${path}` : ""}`;
+  try {
+    return await fetch(url, {
     ...opts,
     headers: {
       Authorization: `Bearer ${store.settings.token}`,
@@ -107,6 +115,11 @@ function gh(path, opts = {}) {
       ...(opts.headers || {}),
     },
   });
+  } catch (e) {
+    throw new Error(navigator.onLine === false
+      ? "You're offline. Changes are saved on this device and will sync when you're back online"
+      : "Couldn't reach GitHub. Check your connection, or turn off any content blocker for this site");
+  }
 }
 
 const toB64 = (bytes) => {
