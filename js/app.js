@@ -1,35 +1,21 @@
-import { AREAS, BLOCKS, getLesson, lessonLabel } from "./curriculum.js?v=3";
-import { greet } from "./greetings.js?v=3";
-import { GOALS, TIERS, context, currentTier, focusGoals, isDone, recordBestStreak, weakestArea } from "./goals.js?v=3";
-import { REASONS, dayStatus, excuseOn, nudgeCheck, practisedOn, sessionsOn, shiftTargets, streak, weekSummary } from "./schedule.js?v=3";
-import { configured, exportJSON, getAudio, importJSON, putAudio, saveSettings, stamp, store, syncNow, testConnection, update } from "./store.js?v=3";
-import { Metronome, chime, extFor, recordingSupported, startRecording } from "./audio.js?v=3";
-import { addDays, daysBetween, dayName, esc, fmt, monthName, mondayOf, parse, pickRandom, prettyDate, reducedMotion, shortDay, today, uid, weekday } from "./util.js?v=3";
+import { AREAS, BLOCKS, LESSON_COUNT, WEEKS, getLesson, lessonLabel } from "./curriculum.js?v=4";
+import { greet } from "./greetings.js?v=4";
+import { GOALS, TIERS, context, currentTier, focusGoals, isDone, recordBestStreak, weakestArea } from "./goals.js?v=4";
+import { REASONS, dayStatus, excuseOn, nudgeCheck, practisedOn, sessionsOn, shiftTargets, streak, weekSummary } from "./schedule.js?v=4";
+import { configured, exportJSON, getAudio, importJSON, putAudio, saveSettings, stamp, store, syncNow, testConnection, update } from "./store.js?v=4";
+import { Metronome, chime, extFor, recordingSupported, startRecording } from "./audio.js?v=4";
+import { addDays, daysBetween, dayName, esc, fmt, monthName, mondayOf, parse, pickRandom, prettyDate, reducedMotion, shortDay, today, uid, weekday } from "./util.js?v=4";
+import { icon, moodFace, pick } from "./icons.js?v=4";
+import { countUps, mountStrings, setSound, soundOn, splitWords, stringsMarkup, waveform } from "./fx.js?v=4";
 
 const view = document.getElementById("view");
 const $ = (sel, root = view) => root.querySelector(sel);
 const $$ = (sel, root = view) => [...root.querySelectorAll(sel)];
 
-// ---------- doodles ----------
 const MOODS = ["Rough", "Meh", "Okay", "Good", "Buzzing"];
-function face(n, size = 44) {
-  const mouths = [
-    "M14 33 Q22 25 30 33",      // frown
-    "M14 31 L30 30",             // flat
-    "M14 29 Q22 33 30 29",       // slight smile
-    "M13 27 Q22 37 31 27",       // smile
-    "M12 26 Q22 40 32 26 Z",     // grin
-  ];
-  const eyes = n === 4
-    ? `<path d="M13 15 l2 4 l2 -4 M27 15 l2 4 l2 -4" class="ink" fill="none"/>`
-    : `<circle cx="16" cy="18" r="2.2" class="fill"/><circle cx="28" cy="18" r="2.2" class="fill"/>`;
-  return `<svg class="face" viewBox="0 0 44 44" width="${size}" height="${size}" aria-hidden="true">
-    <path d="M22 3 C35 2 42 11 41 23 C40 35 31 42 21 41 C10 40 3 32 3 21 C4 10 11 4 22 3 Z" class="ink" fill="none"/>
-    ${eyes}<path d="${mouths[n]}" class="ink" fill="${n === 4 ? "currentColor" : "none"}"/></svg>`;
-}
-const PICK_PATH = "M12 1 C19 1 23 5 23 10 C23 17 16 23 12 23 C8 23 1 17 1 10 C1 5 5 1 12 1 Z";
-const pickSvg = (cls = "") => `<svg class="pick ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${PICK_PATH}"/></svg>`;
-const squiggle = `<svg class="squiggle" viewBox="0 0 300 14" preserveAspectRatio="none" aria-hidden="true"><path d="M2 9 C30 2 50 13 80 7 S130 3 160 8 S220 12 250 6 S290 5 298 8"/></svg>`;
+const STEP_NAMES = ["Guitar", ...BLOCKS.map((b) => b.label.replace(" & timing", "").replace("Fretboard & ear", "Fretboard").replace("Record a take", "Record")), "Journal"];
+const pad2 = (n) => String(n).padStart(2, "0");
+const mmss = (s) => `${Math.floor(s / 60)}:${pad2(Math.floor(s % 60))}`;
 
 function tally(n) {
   let out = "";
@@ -43,6 +29,7 @@ function tally(n) {
 const firstSentence = (t) => (t.match(/^.*?[.!?](\s|$)/) || [t])[0].trim();
 const liveSessions = () => Object.values(store.state.sessions).filter((s) => !s.deleted);
 const lessonsDone = () => liveSessions().filter((s) => s.lesson != null).length;
+const statusIcon = { done: "check", missed: "x" };
 
 // ---------- header ----------
 function renderSync() {
@@ -50,14 +37,29 @@ function renderSync() {
   const { status, message } = store.sync;
   el.dataset.status = configured() ? status : "off";
   el.title = configured() ? message : "Not syncing yet. Set it up in Settings";
-  el.querySelector("span").textContent = configured() ? (status === "ok" ? "synced" : status === "error" ? "sync error" : status === "syncing" ? "syncing…" : "sync") : "local only";
+  el.querySelector("span").textContent = configured() ? (status === "ok" ? "Synced" : status === "error" ? "Sync error" : status === "syncing" ? "Syncing…" : "Sync") : "Local only";
 }
 function renderNav(route) {
-  for (const a of document.querySelectorAll("nav a")) a.classList.toggle("on", a.getAttribute("href") === `#/${route}`);
+  const nav = document.getElementById("nav");
+  let active = null;
+  for (const a of nav.querySelectorAll("a")) {
+    const on = a.getAttribute("href") === `#/${route}` || (route === "lesson" && a.getAttribute("href") === "#/");
+    a.classList.toggle("on", on);
+    if (on) { a.setAttribute("aria-current", "page"); active = a; } else a.removeAttribute("aria-current");
+  }
+  const ink = nav.querySelector(".nav-ink");
+  if (active) { ink.style.transform = `translateX(${active.offsetLeft}px)`; ink.style.width = `${active.offsetWidth}px`; ink.style.opacity = 1; }
+}
+const effectiveTheme = () => document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+function renderThemeBtn() {
+  const b = document.getElementById("theme");
+  b.innerHTML = icon(effectiveTheme() === "dark" ? "sun" : "moon");
+  b.title = effectiveTheme() === "dark" ? "Switch to light mode" : "Switch to stage (dark) mode";
 }
 
 // ---------- TODAY ----------
 let greetingLine = null;
+let unmountStrings = null;
 const NUDGES = {
   excuses: [
     "Hey Tom, {n} days off with a reason in the last four weeks. Life happens, and that's fine. But guitar loves routine. How about ten easy minutes today, just for the fun of it?",
@@ -72,6 +74,12 @@ const NUDGES = {
     "Five a week is the deal, Tom, and you're {n} short. Squeeze one in or shift one to Saturday. You've got this.",
   ],
 };
+
+function weekRing(practised, required) {
+  const total = Math.max(required, 1), r = 22, c = 2 * Math.PI * r, gapLen = 4, seg = c / total - gapLen;
+  return `<svg class="ring" viewBox="0 0 56 56" aria-hidden="true">${Array.from({ length: total }, (_, i) =>
+    `<circle cx="28" cy="28" r="${r}" class="${i < practised ? "on" : ""}" stroke-dasharray="${seg.toFixed(2)} ${(c - seg).toFixed(2)}" stroke-dashoffset="${(-i * (seg + gapLen)).toFixed(2)}" style="--d:${i * 90}ms"/>`).join("")}</svg>`;
+}
 
 function renderToday() {
   const s = store.state, now = today();
@@ -92,94 +100,119 @@ function renderToday() {
   const wk = weekSummary(s, now);
   const lesson = getLesson(done);
   const todays = sessionsOn(s, now).filter((x) => x.lesson != null);
+  const best = Math.max(str, s.goals["_best-streak"]?.value || 0);
 
-  const runSheet = BLOCKS.map((b) => `<li><b>${b.label}</b> <span class="mins">${b.mins}m</span> ${b.key === "free" ? "Anything you like. This is the fun bit." : b.key === "rec" ? "Record: " + esc(lesson.blocks.rec) : esc(firstSentence(lesson.blocks[b.key]))}</li>`).join("");
+  const timeline = BLOCKS.map((b) => `<span class="seg seg-${b.key}" style="--m:${b.mins}" title="${b.label}: ${b.mins} min"></span>`).join("");
+  const setlist = BLOCKS.map((b, i) => `<li class="seg-${b.key}"><span class="n">${pad2(i + 1)}</span>
+      <div><b>${b.label}</b><p>${b.key === "free" ? "Anything you like. This is the fun bit." : b.key === "rec" ? esc(lesson.blocks.rec) : esc(firstSentence(lesson.blocks[b.key]))}</p></div>
+      <span class="m">${b.mins}′</span></li>`).join("");
 
-  let lastPara;
-  if (!last) lastPara = `<p>This is page one, so there's nothing to look back on yet. ${esc(lesson.buildsOn)}</p>`;
+  let recap;
+  if (!last) recap = `<div class="recap-item wide"><p class="eyebrow">Page one</p><p>Nothing to look back on yet. ${esc(lesson.buildsOn)}</p></div>`;
   else {
     const L = getLesson(last.lesson, last.guitar);
-    const how = last.journal?.how ? ` You wrote: <q>${esc(last.journal.how.slice(0, 140))}${last.journal.how.length > 140 ? "…" : ""}</q>` : "";
-    lastPara = `<p><span class="hl">Last time</span> (${dayName(last.date)}) was <b>${esc(L.title)}</b>: ${esc(firstSentence(L.blocks.x)).toLowerCase()}${how}</p>
-      <p><span class="hl green">Today builds on it:</span> ${esc(lesson.buildsOn)}</p>`;
+    const how = last.journal?.how ? `<q>${esc(last.journal.how.slice(0, 140))}${last.journal.how.length > 140 ? "…" : ""}</q>` : "";
+    recap = `<div class="recap-item"><p class="eyebrow">Last time · ${dayName(last.date)}</p><p><b>${esc(L.title)}.</b> ${esc(firstSentence(L.blocks.x))}</p>${how}</div>
+      <div class="recap-item"><p class="eyebrow">How today builds on it</p><p>${esc(lesson.buildsOn)}</p></div>`;
   }
 
   let planCard;
   if (st === "done") {
     const t = todays[0];
-    planCard = `<section class="page card plan">
-      <div class="tape"></div>
-      <h2>Done for today ${pickSvg("inline")}</h2>
-      ${t ? `<p>You did <b>${esc(t.title)}</b> (${lessonLabel(t.lesson)}) on the ${esc(t.guitar)}.${t.journal?.win ? ` Today's win: <q>${esc(t.journal.win)}</q>` : ""}</p>` : `<p>Practice logged. Nice one.</p>`}
-      <p class="muted">Tomorrow's page: <b>${esc(lesson.title)}</b> (${lessonLabel(done)}).</p>
-      <div class="row"><a class="btn ghost" href="#/tapes">Listen back</a><a class="btn ghost" href="#/lesson">Fancy another? Do the next one now</a></div>
+    planCard = `<section class="card plan state">
+      <div class="state-mark done">${icon("check")}</div>
+      <p class="eyebrow">Today · done</p>
+      <h2 class="display">That's today in the bag.</h2>
+      ${t ? `<p class="lead">You played <b>${esc(t.title)}</b> on the ${esc(t.guitar)}.${t.journal?.win ? ` Today's win: <q>${esc(t.journal.win)}</q>` : ""}</p>` : `<p class="lead">Practice logged. Nice one.</p>`}
+      <p class="muted">Up next: <b>${esc(lesson.title)}</b> · ${lessonLabel(done)}</p>
+      <div class="row"><a class="btn" href="#/tapes">${icon("tape")} Listen back</a><a class="btn ghost" href="#/lesson">Fancy another? Do the next one ${icon("arrowRight")}</a></div>
     </section>`;
   } else if (st === "excused") {
     const ex = excuseOn(s, now);
-    planCard = `<section class="page card plan"><div class="tape"></div>
-      <h2>Logged as: ${REASONS[ex.reason].label.toLowerCase()}</h2>
-      <p>${ex.reason === "sick" ? "Rest up, Tom. Your hands will be fresh when you're back." : ex.reason === "holiday" ? "Enjoy the break, Tom! If there's a guitar where you are, noodle away." : "Hope everything's okay, Tom. The guitar will be here when you're ready."}</p>
+    planCard = `<section class="card plan state">
+      <div class="state-mark">${icon("heart")}</div>
+      <p class="eyebrow">Today · ${REASONS[ex.reason].label.toLowerCase()}</p>
+      <h2 class="display">${ex.reason === "sick" ? "Rest up, Tom." : ex.reason === "holiday" ? "Enjoy the break." : "Look after yourself."}</h2>
+      <p class="lead">${ex.reason === "sick" ? "Your hands will be fresh when you're back." : ex.reason === "holiday" ? "If there's a guitar where you are, noodle away. No pressure." : "The guitar will be right here when you're ready."}</p>
       <div class="row"><button class="btn ghost" data-act="unexcuse" data-date="${now}">Actually, I'm fine. Remove it</button></div>
     </section>`;
   } else if (st === "off") {
-    planCard = `<section class="page card plan"><div class="tape"></div>
-      <h2>Day off</h2>
-      <p>No lesson scheduled today. Rest counts as practice too: your brain sorts out what you've learnt while you're away from the guitar.</p>
-      <p class="muted">Next lesson: <b>${esc(lesson.title)}</b> (${lessonLabel(done)}).</p>
-      <div class="row"><a class="btn ghost" href="#/lesson">Itching to play? Do it now</a></div>
+    planCard = `<section class="card plan state">
+      <div class="state-mark">${icon("sparkle")}</div>
+      <p class="eyebrow">Today · day off</p>
+      <h2 class="display">Rest is part of the practice.</h2>
+      <p class="lead">No lesson today. Your brain keeps sorting out what you've learnt while you're away from the guitar.</p>
+      <p class="muted">Up next: <b>${esc(lesson.title)}</b> · ${lessonLabel(done)}</p>
+      <div class="row"><a class="btn ghost" href="#/lesson">Itching to play? Do it now ${icon("arrowRight")}</a></div>
     </section>`;
   } else {
-    planCard = `<section class="page card plan"><div class="tape"></div>
-      <p class="tag">${lessonLabel(done)} · ${esc(lesson.weekTitle)}</p>
-      <h2>Today: ${esc(lesson.title)}</h2>
-      <ol class="runsheet">${runSheet}</ol>
-      ${lastPara}
-      <div class="row"><a class="btn big" href="#/lesson">Start today's lesson →</a><span class="muted small">30 minutes · electric or acoustic</span></div>
+    planCard = `<section class="card plan">
+      <header class="plan-head">
+        <div>
+          <p class="eyebrow">${lessonLabel(done)} · ${esc(lesson.weekTitle)}</p>
+          <h2 class="display">${esc(lesson.title)}</h2>
+        </div>
+        <div class="plan-time"><b>30</b><span>min</span></div>
+      </header>
+      <div class="timeline" aria-hidden="true">${timeline}</div>
+      <ol class="setlist">${setlist}</ol>
+      <div class="recap">${recap}</div>
+      <footer class="plan-foot">
+        <a class="btn primary lg" href="#/lesson">Start today's lesson ${icon("arrowRight")}</a>
+        <span class="hand">electric or acoustic, your call</span>
+      </footer>
     </section>`;
   }
 
   const strip = Array.from({ length: 7 }, (_, i) => {
-    const d = addDays(wk.mon, i), ds = dayStatus(s, d);
-    const ex = excuseOn(s, d);
-    return `<a class="mini ${ds}${d === now ? " now" : ""}" href="#/tracker" title="${prettyDate(d)}: ${ds}"><small>${shortDay(d)[0]}</small>${ex ? REASONS[ex.reason].mark : ""}</a>`;
+    const d = addDays(wk.mon, i), ds = dayStatus(s, d), ex = excuseOn(s, d);
+    const mark = ex ? `<em>${REASONS[ex.reason].mark}</em>` : statusIcon[ds] ? icon(statusIcon[ds]) : "";
+    return `<a class="dpill ${ds}${d === now ? " now" : ""}" href="#/tracker" title="${prettyDate(d)}: ${ds}"><span class="dl">${shortDay(d)}</span><span class="dn">${parse(d).getDate()}</span><span class="dm">${mark}</span></a>`;
   }).join("");
 
-  const goals = focusGoals(s, 2);
+  const goals = focusGoals(s, 3);
 
   view.innerHTML = `
     <section class="hero">
-      <div class="hero-text">
-        <p class="date">${prettyDate(now)}</p>
-        <h1 class="greet">${esc(greetingLine)}</h1>${squiggle}
+      <div class="hero-head">
+        <p class="eyebrow">${prettyDate(now)}</p>
+        <h1 class="greet">${splitWords(esc(greetingLine))}</h1>
       </div>
-      <div class="stickers">
-        <span class="sticker streak" title="Practice streak">${pickSvg()}<b>${str}</b><small>day streak</small></span>
-        <span class="sticker week"><b>${wk.practised}/${Math.max(wk.required, 1)}</b><small>this week</small></span>
-        <span class="sticker lessons"><b>${done}</b><small>lessons done</small></span>
+      <div class="stats">
+        <div class="stat"><span class="stat-icon flame">${icon("flame")}</span><b data-count="${str}">${str}</b><span class="stat-label">day streak</span><span class="stat-foot">best ${best}</span></div>
+        <div class="stat"><div class="ring-wrap">${weekRing(wk.practised, Math.max(wk.required, 1))}<b>${wk.practised}</b></div><span class="stat-label">of ${Math.max(wk.required, 1)} this week</span><span class="stat-foot">${wk.onTrack ? "on track" : "behind"}</span></div>
+        <div class="stat"><span class="stat-icon">${icon("note")}</span><b data-count="${done}">${done}</b><span class="stat-label">lessons done</span><span class="bar"><i style="width:${Math.min(100, (done / LESSON_COUNT) * 100)}%"></i></span></div>
+      </div>
+      <div class="strings-wrap">
+        ${stringsMarkup()}
+        <span class="hand strum-hint" aria-hidden="true">strum me</span>
+        <button class="icon-btn sound" data-act="sound" aria-label="${soundOn() ? "Mute the strings" : "Unmute the strings"}" title="${soundOn() ? "Mute" : "Unmute"}">${icon(soundOn() ? "volume" : "volumeOff")}</button>
       </div>
     </section>
-    ${nudge ? `<aside class="sticky pink nudge" role="status"><b>A warm nudge</b><p>${esc(pickRandom(NUDGES[nudge.kind]).replace("{n}", nudge.count).replace("{s}", nudge.count === 1 ? "" : "s"))}</p></aside>` : ""}
+    ${nudge ? `<aside class="nudge" role="status"><span class="nudge-icon">${icon("heart")}</span><div><b>A warm nudge</b><p>${esc(pickRandom(NUDGES[nudge.kind]).replace("{n}", nudge.count).replace("{s}", nudge.count === 1 ? "" : "s"))}</p></div></aside>` : ""}
     <div class="cols today-grid">
-    <div class="col-main">${planCard}</div>
-    <aside class="col-side">
-      <div class="card">
-        <h3>This week</h3>
-        <div class="strip">${strip}</div>
-        <p class="small muted">Five a week, weekdays by default. Tap a day to move or excuse a lesson.</p>
-      </div>
-      <div class="card">
-        <h3>Working towards</h3>
-        ${goals.map((g) => `<div class="sticky ${g.tier % 2 ? "blue" : "yellow"} mini-goal">${esc(g.title)}</div>`).join("") || "<p>Everything ticked off. Legend.</p>"}
-        <a class="small" href="#/goals">All goals →</a>
-      </div>
-    </aside>
+      <div class="col-main">${planCard}</div>
+      <aside class="col-side">
+        <div class="card week-card">
+          <div class="card-head"><h3>This week</h3><span class="kpi">${wk.practised}<small>/${Math.max(wk.required, 1)}</small></span></div>
+          <div class="strip">${strip}</div>
+          <p class="small muted">Weekdays by default. Tap a day to move a lesson or log a reason.</p>
+        </div>
+        <div class="card goals-card">
+          <div class="card-head"><h3>Working towards</h3><a class="small link" href="#/goals">All goals ${icon("arrowRight")}</a></div>
+          <ul class="goal-mini">${goals.map((g) => `<li><span class="dot"></span><div><p>${esc(g.title)}</p><span class="chip">${AREAS[g.area]}</span></div></li>`).join("") || "<li><p>Everything ticked off. Legend.</p></li>"}</ul>
+        </div>
+      </aside>
     </div>`;
+  unmountStrings?.();
+  unmountStrings = mountStrings($(".strings"), () => $(".strum-hint")?.classList.add("gone"));
+  countUps(view);
 }
 
 // ---------- LESSON ----------
 const LESSON_KEY = "gh.lesson.v1";
 let lessonRun = null;      // { index, guitar, step, startedAt }
-let pendingTake = null;    // { blob, mime, secs, url }
+let pendingTake = null;    // { blob, mime, secs, url } or { skipped: true }
 let timer = null;          // { left, total, running, handle }
 let metro = null;
 let recorder = null;
@@ -203,24 +236,53 @@ function ensureRun() {
   if (!pendingTake && lessonRun.step > 6) lessonRun.step = 6; // take was lost on reload
 }
 
+function lessonHead(L, index, step) {
+  const steps = STEP_NAMES.map((n, i) => `<li class="${i < step ? "done" : i === step ? "now" : ""}"><span>${n}</span></li>`).join("");
+  return `<header class="lesson-head">
+    <a class="back-link" href="#/">${icon("arrowLeft")} Today</a>
+    <p class="eyebrow">${lessonLabel(index)} · ${esc(L.weekTitle)}</p>
+    <h1 class="display lesson-title">${esc(L.title)}</h1>
+    <ol class="steps" aria-label="Step ${step + 1} of ${STEP_NAMES.length}">${steps}</ol>
+  </header>`;
+}
+
+const RING_C = 2 * Math.PI * 54;
+function timerCard(mins) {
+  return `<div class="tool timer" data-total="${mins * 60}">
+    <p class="eyebrow">Timer</p>
+    <div class="timer-face">
+      <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="54"/><circle class="prog" cx="60" cy="60" r="54" stroke-dasharray="${RING_C.toFixed(1)}" stroke-dashoffset="0"/></svg>
+      <span class="clock">${mins}:00</span>
+    </div>
+    <div class="row center"><button class="btn primary" data-act="timer">${icon("play")} <span>Start</span></button><button class="icon-btn" data-act="timer-reset" aria-label="Reset timer" title="Reset">${icon("reset")}</button></div>
+  </div>`;
+}
+
+function metroCard(bpm) {
+  return `<div class="tool metro">
+    <p class="eyebrow">${icon("metronome")} Metronome</p>
+    <div class="bpm"><button class="icon-btn" data-act="bpm" data-d="-5" aria-label="Slower">${icon("minus")}</button><output>${bpm}</output><button class="icon-btn" data-act="bpm" data-d="5" aria-label="Faster">${icon("plus")}</button></div>
+    <span class="bpm-label">bpm</span>
+    <div class="beats">${"<i></i>".repeat(4)}</div>
+    <button class="btn" data-act="metro">${icon("play")} <span>Start click</span></button>
+  </div>`;
+}
+
 function renderLesson() {
   stopAll();
   ensureRun();
   const { index, guitar, step } = lessonRun;
   const L = getLesson(index, guitar || "electric");
-  const steps = BLOCKS.length + 2; // guitar pick + blocks + journal
-  const progress = `<div class="progress" aria-label="Step ${step + 1} of ${steps}">${Array.from({ length: steps }, (_, i) => `<i class="${i < step ? "done" : i === step ? "now" : ""}"></i>`).join("")}</div>`;
-  const head = `<p class="tag">${lessonLabel(index)} · ${esc(L.weekTitle)}</p><h1 class="lesson-title">${esc(L.title)}</h1>${progress}`;
+  const head = lessonHead(L, index, step);
 
   if (step === 0) {
-    view.innerHTML = `<section class="page card">${head}
-      <h2>Which guitar today?</h2>
-      <p>I'll tailor the technique and tone tips to it.</p>
+    view.innerHTML = `<section class="lesson">${head}
+      <div class="choose-intro"><h2 class="display">Which guitar today?</h2><p class="lead">The technique and tone tips will match it.</p></div>
       <div class="guitars">
-        <button class="guitar-btn" data-act="guitar" data-g="electric">${guitarDoodle("electric")}<b>Electric</b></button>
-        <button class="guitar-btn" data-act="guitar" data-g="acoustic">${guitarDoodle("acoustic")}<b>Acoustic</b></button>
+        <button class="guitar-card" data-act="guitar" data-g="electric">${guitarArt("electric")}<b>Electric</b><span>Bends, palm muting, amp tone</span></button>
+        <button class="guitar-card" data-act="guitar" data-g="acoustic">${guitarArt("acoustic")}<b>Acoustic</b><span>Strumming, projection, pick position</span></button>
       </div>
-      <p class="muted small">Builds on: ${esc(L.buildsOn)}</p>
+      <p class="builds"><span class="hand">builds on</span> ${esc(L.buildsOn)}</p>
     </section>`;
     return;
   }
@@ -230,58 +292,73 @@ function renderLesson() {
     const text = L.blocks[b.key];
     const showMetro = ["w", "x", "r", "s"].includes(b.key);
     let body = `<p class="block-text">${esc(text)}</p>`;
-    if (b.key === "x" && L.tab) body += `<pre class="tab">${esc(L.tab)}</pre>`;
-    if (b.key === "x") body += `<p class="tone"><b>Tone &amp; taste (${esc(guitar)}):</b> ${esc(L.tone)}</p>`;
+    if (b.key === "x" && L.tab) body += `<figure class="tab-card"><figcaption class="eyebrow">Tab</figcaption><pre class="tab">${esc(L.tab)}</pre></figure>`;
+    if (b.key === "x") body += `<aside class="tone"><span class="hand">tone &amp; taste · ${esc(guitar)}</span><p>${esc(L.tone)}</p></aside>`;
     if (b.key === "rec") body = recordBlock(L);
-    if (b.key === "free") body = `<p class="block-text">${esc(text)}</p><p class="muted">Or ignore that and play whatever makes you grin. That's the point of free play.</p>`;
-    view.innerHTML = `<section class="page card lesson">${head}
-      <div class="block-head"><h2>${b.label}</h2><span class="mins">${b.mins} min</span></div>
-      <div class="block-grid">
-        <div>${body}</div>
-        <div class="tools">
-          ${b.key !== "rec" ? `<div class="timer" data-total="${b.mins * 60}"><span class="clock">${b.mins}:00</span><div class="row"><button class="btn small" data-act="timer">Start timer</button><button class="btn small ghost" data-act="timer-reset">Reset</button></div></div>` : ""}
-          ${showMetro ? metroWidget(L.bpm) : ""}
-        </div>
+    if (b.key === "free") body = `<p class="block-text">${esc(text)}</p><p class="lead muted">Or ignore that and play whatever makes you grin. That's the whole point of free play.</p>`;
+    const isLast = step === BLOCKS.length;
+    view.innerHTML = `<section class="lesson">${head}
+      <div class="lesson-body">
+        <article class="card block seg-${b.key}">
+          <p class="eyebrow"><span class="step-n">${pad2(step)}</span> ${b.mins} min</p>
+          <h2 class="display block-title">${b.label}</h2>
+          ${body}
+        </article>
+        <aside class="tools">
+          ${b.key !== "rec" ? timerCard(b.mins) : ""}
+          ${showMetro ? metroCard(L.bpm) : ""}
+        </aside>
       </div>
-      <div class="row nav-row">
-        <button class="btn ghost" data-act="prev">← Back</button>
-        <button class="btn" data-act="next" ${b.key === "rec" && !pendingTake?.url ? "data-needs-take" : ""}>${step === BLOCKS.length ? "Write it up →" : "Next →"}</button>
-      </div>
+      <footer class="lesson-nav">
+        <button class="btn ghost" data-act="prev">${icon("arrowLeft")} Back</button>
+        <button class="btn primary lg" data-act="next" ${b.key === "rec" && !pendingTake?.url ? "data-needs-take" : ""}>${isLast ? "Write it up" : "Next"} ${icon("arrowRight")}</button>
+      </footer>
     </section>`;
     if (showMetro) bindMetro(L.bpm);
     return;
   }
 
-  // Journal
-  view.innerHTML = `<section class="page card lesson">${head}
-    <h2>Journal</h2>
-    <p>Quick notes for future Tom. Two minutes, tops.</p>
-    <form id="journal"><div class="journal-grid"><div>
-      <fieldset class="moods"><legend>How did it feel overall?</legend>
-        ${MOODS.map((m, i) => `<label class="mood"><input type="radio" name="mood" value="${i}" ${i === 3 ? "checked" : ""}>${face(i)}<span>${m}</span></label>`).join("")}
-      </fieldset>
-      <fieldset class="ratings"><legend>How solid did each area feel? (1 = shaky, 5 = nailed it)</legend>
-        ${L.areas.map((a) => `<div class="rate"><span>${AREAS[a]}</span>${[1, 2, 3, 4, 5].map((v) => `<label><input type="radio" name="r-${a}" value="${v}" ${v === 3 ? "checked" : ""}><b>${v}</b></label>`).join("")}</div>`).join("")}
-      </fieldset></div><div>
-      <label class="field">How did it go?<textarea name="how" rows="3" placeholder="e.g. Changes were smoother, but the bend was flat…"></textarea></label>
-      <label class="field">What felt hard?<textarea name="hard" rows="2"></textarea></label>
-      <label class="field">One small win<input name="win" placeholder="e.g. Got through the song without stopping!"></label></div></div>
-      <div class="row nav-row"><button type="button" class="btn ghost" data-act="prev">← Back</button><button class="btn big" type="submit">Save today's page ✓</button></div>
+  view.innerHTML = `<section class="lesson">${head}
+    <form id="journal" class="card journal">
+      <div class="journal-intro"><h2 class="display">How did it go?</h2><p class="lead">Quick notes for future Tom. Two minutes, tops.</p></div>
+      <div class="journal-grid">
+        <div>
+          <fieldset class="moods"><legend class="eyebrow">Overall feel</legend>
+            <div class="mood-row">${MOODS.map((m, i) => `<label class="mood"><input type="radio" name="mood" value="${i}" ${i === 3 ? "checked" : ""}>${moodFace(i, 34)}<span>${m}</span></label>`).join("")}</div>
+          </fieldset>
+          <fieldset class="ratings"><legend class="eyebrow">How solid did each area feel?</legend>
+            ${L.areas.map((a) => `<div class="rate"><span>${AREAS[a]}</span><div class="seg-ctl">${[1, 2, 3, 4, 5].map((v) => `<label><input type="radio" name="r-${a}" value="${v}" ${v === 3 ? "checked" : ""}><b>${v}</b></label>`).join("")}</div></div>`).join("")}
+            <p class="scale small muted"><span>shaky</span><span>nailed it</span></p>
+          </fieldset>
+        </div>
+        <div>
+          <label class="field"><span class="eyebrow">What happened</span><textarea name="how" rows="4" placeholder="Changes were smoother, but the bend was flat…"></textarea></label>
+          <label class="field"><span class="eyebrow">What felt hard</span><textarea name="hard" rows="2" placeholder="That F chord, again"></textarea></label>
+          <label class="field"><span class="eyebrow">One small win</span><input name="win" placeholder="Got through the song without stopping!"></label>
+        </div>
+      </div>
+      <footer class="lesson-nav"><button type="button" class="btn ghost" data-act="prev">${icon("arrowLeft")} Back</button><button class="btn primary lg" type="submit">${icon("check")} Save today's page</button></footer>
     </form>
   </section>`;
 }
 
-function guitarDoodle(kind) {
+function guitarArt(kind) {
+  const strings = Array.from({ length: 6 }, (_, i) => `<path class="gs" d="M${kind === "electric" ? 36 : 40} ${36.5 + i * 1.4} L190 ${36.5 + i * 1.4}"/>`).join("");
   return kind === "electric"
-    ? `<svg viewBox="0 0 120 60" class="g-doodle" aria-hidden="true"><path class="ink" fill="none" d="M8 34 C6 22 18 16 28 22 C34 14 46 14 50 24 C56 30 54 44 44 46 C36 52 22 50 16 46 C10 44 9 40 8 34 Z M50 30 L112 26 M50 34 L112 30 M104 20 L116 20 L116 36 L104 36"/><circle class="fill" cx="30" cy="34" r="3"/><path class="ink" d="M36 28 L36 40" /></svg>`
-    : `<svg viewBox="0 0 120 60" class="g-doodle" aria-hidden="true"><path class="ink" fill="none" d="M6 32 C4 16 22 10 32 20 C40 12 58 16 56 32 C58 48 40 54 32 46 C22 56 4 48 6 32 Z M56 29 L112 27 M56 35 L112 33 M104 21 L116 21 L116 39 L104 39"/><circle class="ink" fill="none" cx="34" cy="32" r="7"/></svg>`;
+    ? `<svg viewBox="0 0 200 80" class="g-art" aria-hidden="true">
+        <path class="body" d="M18 40C17 24 29 13 43 18c7-9 23-9 28 1 8 3 11 12 8 19 4 7 2 17-6 20-5 9-21 9-28 1C30 66 19 56 18 40z"/>
+        <rect class="neck" x="78" y="35" width="98" height="10" rx="2"/>
+        <path class="head" d="M176 33.5l18-5 2 22-20-4.5z"/>
+        <rect class="hw" x="44" y="33" width="5" height="14" rx="1.5"/><rect class="hw" x="56" y="33" width="5" height="14" rx="1.5"/><rect class="hw" x="30" y="34" width="4" height="12" rx="1"/>
+        ${strings}<circle class="knob" cx="40" cy="56" r="3"/><circle class="knob" cx="50" cy="59" r="3"/></svg>`
+    : `<svg viewBox="0 0 200 80" class="g-art" aria-hidden="true">
+        <path class="body" d="M14 40C13 20 33 13 46 22c6-5 16-6 22 1 13-8 26 3 26 17s-13 25-26 17c-6 7-16 6-22 1C33 67 13 60 14 40z"/>
+        <circle class="hole" cx="66" cy="40" r="9"/>
+        <rect class="neck" x="92" y="35" width="84" height="10" rx="2"/>
+        <path class="head" d="M176 33.5l18-3.5v20l-18-3.5z"/>
+        <rect class="hw" x="34" y="34" width="5" height="12" rx="1.5"/>${strings}</svg>`;
 }
 
-function metroWidget(bpm) {
-  return `<div class="metro"><button class="btn small" data-act="metro">▶ Metronome</button>
-    <div class="bpm"><button data-act="bpm" data-d="-5" aria-label="Slower">−</button><output>${bpm}</output><span>bpm</span><button data-act="bpm" data-d="5" aria-label="Faster">+</button></div>
-    <div class="beats">${"<i></i>".repeat(4)}</div></div>`;
-}
 function bindMetro(bpm) {
   metro = new Metronome((b) => {
     $$(".beats i").forEach((el, i) => el.classList.toggle("on", i === b));
@@ -292,25 +369,34 @@ function bindMetro(bpm) {
 function recordBlock(L) {
   if (!recordingSupported()) return `<p class="block-text">${esc(L.blocks.rec)}</p><p class="warn">This browser can't record audio. Try Chrome or Safari, or skip this take.</p>`;
   return `<p class="block-text"><b>Record this:</b> ${esc(L.blocks.rec)}</p>
-    <p class="muted small">Up to 90 seconds. Count yourself in, play it, done. This becomes evidence of your progress, so no noodling!</p>
+    <p class="muted">Up to 90 seconds. Count yourself in, play it, done. It becomes evidence of your progress, so no noodling.</p>
     <div class="recorder">
-      <button class="rec-btn" data-act="rec" aria-label="Record"><span></span></button>
-      <div class="meter"><i></i></div><span class="rec-time">0:00</span>
+      <button class="rec-btn" data-act="rec" aria-label="Start recording"><span></span></button>
+      <div class="live-wave" aria-hidden="true">${"<i></i>".repeat(40)}</div>
+      <span class="rec-time">0:00</span>
     </div>
-    <div class="take">${pendingTake?.url ? `<audio controls src="${pendingTake.url}"></audio><button class="btn small ghost" data-act="retake">Retake</button>` : ""}</div>
-    ${pendingTake?.url ? "" : `<button class="linkish small" data-act="skip-rec">Can't record today? Skip it</button>`}`;
+    <div class="take">${pendingTake?.url ? `<audio controls src="${pendingTake.url}"></audio><button class="btn" data-act="retake">${icon("reset")} Retake</button>` : ""}</div>
+    ${pendingTake?.url ? "" : `<button class="link small" data-act="skip-rec">Can't record today? Skip it</button>`}`;
 }
 
 async function toggleRecord(btn) {
   if (recorder) { recorder.stop(); return; }
   try {
     btn.classList.add("live");
+    btn.setAttribute("aria-label", "Stop recording");
     metro?.stop();
-    const timeEl = $(".rec-time"), bar = $(".meter i");
+    const timeEl = $(".rec-time"), bars = $$(".live-wave i"), levels = new Array(bars.length).fill(0);
+    let last = 0;
     recorder = await startRecording({
       maxSecs: 90,
-      onLevel: (v) => { if (bar) bar.style.transform = `scaleX(${Math.min(1, v * 1.4)})`; },
-      onTick: (s) => { if (timeEl) timeEl.textContent = `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`; },
+      onLevel: (v) => {
+        const t = performance.now();
+        if (t - last < 60) return;
+        last = t;
+        levels.shift(); levels.push(Math.min(1, v * 1.6));
+        bars.forEach((b, i) => b.style.setProperty("--h", Math.max(0.06, levels[i]).toFixed(2)));
+      },
+      onTick: (s) => { if (timeEl) timeEl.textContent = mmss(s); },
     });
     const take = await recorder.done;
     recorder = null;
@@ -324,16 +410,21 @@ async function toggleRecord(btn) {
   }
 }
 
-function tickTimer() {
-  const el = $(".timer .clock");
+function paintTimer() {
+  const el = $(".timer .clock"), prog = $(".timer .prog");
   if (!timer || !el) return;
+  el.textContent = mmss(timer.left);
+  prog.style.strokeDashoffset = (RING_C * (1 - timer.left / timer.total)).toFixed(1);
+}
+function tickTimer() {
+  if (!timer || !$(".timer")) return;
   timer.left = Math.max(0, timer.left - 1);
-  el.textContent = `${Math.floor(timer.left / 60)}:${String(timer.left % 60).padStart(2, "0")}`;
+  paintTimer();
   if (timer.left === 0) {
     clearInterval(timer.handle);
     timer.running = false;
     $(".timer").classList.add("ding");
-    $("[data-act=timer]").textContent = "Time's up!";
+    $("[data-act=timer]").innerHTML = `${icon("check")} <span>Time's up</span>`;
     chime();
   }
 }
@@ -371,19 +462,21 @@ function confetti() {
   if (reducedMotion()) return;
   const layer = document.createElement("div");
   layer.className = "confetti";
-  const colours = ["#ff6b4a", "#ffd23f", "#3bb273", "#4d7cfe", "#ff8fc7"];
-  for (let i = 0; i < 40; i++) {
+  const colours = ["var(--accent)", "var(--highlight)", "var(--done)", "var(--biro)", "var(--ink)"];
+  for (let i = 0; i < 46; i++) {
     const p = document.createElement("span");
-    p.innerHTML = pickSvg();
+    p.innerHTML = pick();
     p.style.left = `${Math.random() * 100}vw`;
     p.style.color = colours[i % colours.length];
-    p.style.animationDelay = `${Math.random() * 0.6}s`;
-    p.style.setProperty("--spin", `${Math.random() * 720 - 360}deg`);
-    p.style.setProperty("--drift", `${Math.random() * 120 - 60}px`);
+    p.style.animationDelay = `${Math.random() * 0.5}s`;
+    p.style.animationDuration = `${2.2 + Math.random() * 1.2}s`;
+    p.style.setProperty("--spin", `${Math.random() * 900 - 450}deg`);
+    p.style.setProperty("--drift", `${Math.random() * 160 - 80}px`);
+    p.style.setProperty("--s", (0.6 + Math.random() * 0.8).toFixed(2));
     layer.appendChild(p);
   }
   document.body.appendChild(layer);
-  setTimeout(() => layer.remove(), 3200);
+  setTimeout(() => layer.remove(), 4000);
 }
 
 // ---------- TRACKER ----------
@@ -402,11 +495,12 @@ function renderTracker() {
     if (!inMonth && days.length >= 28 && days.length % 7 === 0) break;
     days.push(d);
   }
-  const cells = days.map((d) => {
+  const cells = days.map((d, n) => {
     const st = dayStatus(s, d), ex = excuseOn(s, d), inMonth = parse(d).getMonth() === cal.m;
     const hasRec = sessionsOn(s, d).some((x) => x.recording);
-    return `<button class="day ${st}${inMonth ? "" : " out"}${d === now ? " now" : ""}${d === selected ? " sel" : ""}" data-act="day" data-date="${d}" aria-label="${prettyDate(d)}: ${st}">
-      <span class="num">${parse(d).getDate()}</span>${ex ? `<span class="mark">${REASONS[ex.reason].mark}</span>` : ""}${hasRec ? `<span class="recdot" title="Has a recording"></span>` : ""}</button>`;
+    const mark = ex ? `<span class="mark">${REASONS[ex.reason].mark}</span>` : statusIcon[st] ? `<span class="glyph">${icon(statusIcon[st])}</span>` : "";
+    return `<button class="day ${st}${inMonth ? "" : " out"}${d === now ? " now" : ""}${d === selected ? " sel" : ""}" style="--n:${n}" data-act="day" data-date="${d}" aria-label="${prettyDate(d)}: ${st}" aria-pressed="${d === selected}">
+      <span class="num">${parse(d).getDate()}</span>${mark}${hasRec ? `<span class="recdot" title="Has a recording"></span>` : ""}</button>`;
   }).join("");
 
   const weeks = [];
@@ -414,10 +508,9 @@ function renderTracker() {
     const w = weekSummary(s, days[i]);
     if (days[i] > now) break;
     if (days[i + 6] < s.startDate) continue;
-    weeks.push(`<li><span>w/c ${parse(days[i]).getDate()} ${monthName(parse(days[i]).getMonth()).slice(0, 3)}</span>${tally(w.practised)}<b class="${w.practised >= w.required ? "ok" : days[i + 6] < now ? "short" : ""}">${w.practised}/${w.required}</b>${w.excused ? `<small>${w.excused} excused</small>` : ""}</li>`);
+    weeks.push(`<li><span class="wk">${parse(days[i]).getDate()} ${monthName(parse(days[i]).getMonth()).slice(0, 3)}</span><span class="tallies-row">${tally(w.practised)}</span><b class="${w.practised >= w.required ? "ok" : days[i + 6] < now ? "short" : ""}">${w.practised}/${w.required}</b></li>`);
   }
 
-  // all-time stats
   let practised = 0, missed = 0, excused = 0;
   for (let d = s.startDate; d <= now; d = addDays(d, 1)) {
     const st = dayStatus(s, d);
@@ -425,70 +518,70 @@ function renderTracker() {
   }
 
   view.innerHTML = `
+    <header class="page-head"><p class="eyebrow">Tracker</p><h1 class="display">Every day, accounted for.</h1></header>
     <div class="cols tracker-grid">
-    <section class="page card cal-card">
+    <section class="card cal-card">
       <div class="cal-head">
-        <button class="btn small ghost" data-act="month" data-d="-1" aria-label="Previous month">←</button>
-        <h1>${monthName(cal.m)} <small>${cal.y}</small></h1>
-        <button class="btn small ghost" data-act="month" data-d="1" aria-label="Next month">→</button>
+        <h2 class="display">${monthName(cal.m)} <span>${cal.y}</span></h2>
+        <div class="row"><button class="icon-btn" data-act="month" data-d="-1" aria-label="Previous month">${icon("chevronLeft")}</button><button class="icon-btn" data-act="month" data-d="1" aria-label="Next month">${icon("chevronRight")}</button></div>
       </div>
       <div class="cal">
-        ${["M", "T", "W", "T", "F", "S", "S"].map((d) => `<span class="dow">${d}</span>`).join("")}
+        ${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => `<span class="dow">${d}</span>`).join("")}
         ${cells}
       </div>
       <div class="legend">
         <span><i class="done"></i>Practised</span><span><i class="missed"></i>Missed</span><span><i class="off"></i>Not scheduled</span>
-        <span><i class="excused"></i>Excused (S sick · H holiday · E emergency)</span><span><i class="planned"></i>Coming up</span>
+        <span><i class="excused"></i>Excused <small>S sick · H holiday · E emergency</small></span><span><i class="planned"></i>Coming up</span>
       </div>
-      <p class="muted small">Tap a day to move a lesson, log a reason, or see what you played.</p>
     </section>
     <aside class="col-side">
-      <div class="card" id="day-panel">${dayPanel(selected)}</div>
-      <div class="card stats">
-        <h3>The numbers</h3>
+      <div class="card day-card" id="day-panel">${dayPanel(selected)}</div>
+      <div class="card">
         <div class="statgrid">
-          <div><b>${practised}</b><small>days practised</small></div>
-          <div><b>${streak(s)}</b><small>current streak</small></div>
-          <div><b class="red">${missed}</b><small>missed</small></div>
-          <div><b>${excused}</b><small>excused</small></div>
+          <div><b data-count="${practised}">${practised}</b><small>days practised</small></div>
+          <div><b data-count="${streak(s)}">${streak(s)}</b><small>current streak</small></div>
+          <div><b class="red" data-count="${missed}">${missed}</b><small>missed</small></div>
+          <div><b data-count="${excused}">${excused}</b><small>excused</small></div>
         </div>
       </div>
       <div class="card">
-        <h3>Weekly tally</h3>
-        <ul class="tallies">${weeks.join("") || "<li class='muted'>Nothing yet. Your first tally mark is one lesson away.</li>"}</ul>
-        <p class="small muted">Five a week minimum. Sick, holiday and emergency days lower the target.</p>
+        <div class="card-head"><h3>Weekly tally</h3><span class="small muted">target 5</span></div>
+        <ul class="tallies">${weeks.join("") || "<li class='muted'>Your first tally mark is one lesson away.</li>"}</ul>
+        <p class="small muted">Sick, holiday and emergency days lower that week's target.</p>
       </div>
     </aside>
     </div>`;
+  countUps(view);
 }
 
+const STATUS_LABEL = { done: "Practised", missed: "Missed", excused: "Excused", off: "Day off", today: "Today", planned: "Scheduled", pre: "Before you started" };
 function dayPanel(d) {
   const s = store.state, now = today(), st = dayStatus(s, d);
   const sess = sessionsOn(s, d);
-  const reasonBtns = Object.entries(REASONS).map(([k, r]) => `<button class="btn small ghost" data-act="excuse" data-date="${d}" data-reason="${k}">${r.label}</button>`).join("");
-  const targets = shiftTargets(s, d).map((t) => `<button class="btn small" data-act="shift" data-from="${d}" data-to="${t}">${shortDay(t)} ${parse(t).getDate()}</button>`).join("");
+  const reasonBtns = Object.entries(REASONS).map(([k, r]) => `<button class="btn sm" data-act="excuse" data-date="${d}" data-reason="${k}">${r.label}</button>`).join("");
+  const targets = shiftTargets(s, d).map((t) => `<button class="btn sm" data-act="shift" data-from="${d}" data-to="${t}">${icon("move")} ${shortDay(t)} ${parse(t).getDate()}</button>`).join("");
   const movedHere = Object.entries(s.shifts).find(([, v]) => !v.deleted && v.to === d);
   const movedAway = s.shifts[d] && !s.shifts[d].deleted ? s.shifts[d] : null;
   let body = "";
   if (st === "done") {
-    body = sess.map((x) => `<p>${x.lesson != null ? `<b>${esc(x.title)}</b> · ${lessonLabel(x.lesson)}` : "<b>Free practice</b>"} ${x.guitar ? `on the ${esc(x.guitar)}` : ""} ${x.journal?.mood != null ? face(x.journal.mood, 28) : ""}</p>`).join("") + `<a class="small" href="#/tapes">See it in Tapes →</a>`;
+    body = sess.map((x) => `<div class="day-sess">${x.journal?.mood != null ? moodFace(x.journal.mood, 30) : ""}<div><b>${x.lesson != null ? esc(x.title) : "Free practice"}</b><span class="small muted">${x.lesson != null ? lessonLabel(x.lesson) : ""}${x.guitar ? ` · ${esc(x.guitar)}` : ""}</span></div></div>`).join("") + `<a class="link small" href="#/tapes">Open in Tapes ${icon("arrowRight")}</a>`;
   } else if (st === "excused") {
-    body = `<p>Logged as <b>${REASONS[excuseOn(s, d).reason].label.toLowerCase()}</b>.</p><button class="btn small ghost" data-act="unexcuse" data-date="${d}">Remove</button>`;
+    body = `<p>Logged as <b>${REASONS[excuseOn(s, d).reason].label.toLowerCase()}</b>.</p><button class="btn sm" data-act="unexcuse" data-date="${d}">${icon("x")} Remove</button>`;
   } else if (st === "missed") {
-    body = `<p>Scheduled, but no practice logged.</p>
-      <p class="small">Was there a reason?</p><div class="row">${reasonBtns}</div>
-      ${targets ? `<p class="small">Or make it up later this week:</p><div class="row">${targets}</div>` : ""}
-      <p class="small">Actually played but forgot to log it? <button class="linkish" data-act="logfree" data-date="${d}">Log a free practice</button></p>`;
+    body = `<p>Scheduled, but nothing logged.</p>
+      <p class="eyebrow">Was there a reason?</p><div class="row">${reasonBtns}</div>
+      ${targets ? `<p class="eyebrow">Or make it up this week</p><div class="row">${targets}</div>` : ""}
+      <p class="small">Played but forgot to log it? <button class="link" data-act="logfree" data-date="${d}">Log a free practice</button></p>`;
   } else if (st === "today" || st === "planned") {
-    body = `${st === "today" ? `<a class="btn small" href="#/lesson">Start today's lesson →</a>` : ""}<p>${st === "today" ? "Today's lesson." : "Lesson scheduled."}${movedHere ? " (Moved here from " + shortDay(movedHere[0]) + ")" : ""}</p>
-      ${targets ? `<p class="small">Move it to:</p><div class="row">${targets}</div>` : `<p class="small muted">No free days left this week to move it to.</p>`}
-      ${movedHere ? `<button class="btn small ghost" data-act="unshift" data-from="${movedHere[0]}">Undo the move</button>` : ""}
-      <p class="small">Can't do it?</p><div class="row">${reasonBtns}</div>`;
+    body = `${st === "today" ? `<a class="btn primary" href="#/lesson">Start today's lesson ${icon("arrowRight")}</a>` : ""}
+      ${movedHere ? `<p class="small muted">Moved here from ${shortDay(movedHere[0])}. <button class="link" data-act="unshift" data-from="${movedHere[0]}">Undo</button></p>` : ""}
+      ${targets ? `<p class="eyebrow">Move it to</p><div class="row">${targets}</div>` : `<p class="small muted">No free days left this week to move it to.</p>`}
+      <p class="eyebrow">Can't do it?</p><div class="row">${reasonBtns}</div>`;
   } else if (st === "off") {
-    body = movedAway ? `<p>Lesson moved to ${prettyDate(movedAway.to)}.</p><button class="btn small ghost" data-act="unshift" data-from="${d}">Undo the move</button>`
-      : `<p>Not scheduled. ${d <= now ? `<button class="linkish" data-act="logfree" data-date="${d}">Played anyway? Log it</button>` : "Enjoy the day off."}</p>`;
+    body = movedAway ? `<p>Lesson moved to ${prettyDate(movedAway.to)}.</p><button class="btn sm" data-act="unshift" data-from="${d}">${icon("reset")} Undo the move</button>`
+      : `<p class="muted">${d <= now ? `Not scheduled. <button class="link" data-act="logfree" data-date="${d}">Played anyway? Log it</button>` : "Not scheduled. Enjoy the day off."}</p>`;
   } else body = `<p class="muted">Before you started.</p>`;
-  return `<div class="panel"><h3>${prettyDate(d)}</h3>${body}</div>`;
+  return `<div class="panel"><div class="panel-head"><h3>${prettyDate(d)}</h3><span class="badge ${st}">${STATUS_LABEL[st]}</span></div>${body}</div>`;
 }
 
 // ---------- GOALS ----------
@@ -497,108 +590,140 @@ function renderGoals() {
   const next = TIERS[tier + 1];
   const tierDone = GOALS.filter((g) => g.tier === tier && isDone(s, g, ctx)).length;
   const focus = focusGoals(s, 3);
+  const pct = next ? Math.round(100 * (Math.min(ctx.lessons / next.from, 1) + Math.min(tierDone / 2, 1)) / 2) : 100;
   const goalItem = (g) => {
-    const done = isDone(s, g, ctx), locked = g.tier > tier;
-    return `<li class="${done ? "done" : ""}${locked ? " locked" : ""}">
-      <label><input type="checkbox" data-act="goal" data-id="${g.id}" ${done ? "checked" : ""} ${g.auto ? "disabled" : ""}><span class="box"></span>
-      <span>${esc(g.title)} ${g.auto ? `<small class="muted">(ticks itself)</small>` : ""} <small class="area">${AREAS[g.area]}</small></span></label>
-      ${done && s.goals[g.id]?.date ? `<small class="muted">${prettyDate(s.goals[g.id].date)}</small>` : ""}</li>`;
+    const done = isDone(s, g, ctx);
+    return `<li class="${done ? "done" : ""}">
+      <label><input type="checkbox" data-act="goal" data-id="${g.id}" ${done ? "checked" : ""} ${g.auto ? "disabled" : ""}><span class="box">${icon("check")}</span>
+      <span class="gt">${esc(g.title)}${g.auto ? ` <small class="muted">· ticks itself</small>` : ""}</span></label>
+      <span class="chip">${AREAS[g.area]}</span></li>`;
   };
   view.innerHTML = `
-    <div class="goals-top">
-    <section class="page card level">
-      <div class="tape"></div>
-      <p class="tag">Current level</p>
-      <h1>${TIERS[tier].name}</h1>
-      ${next ? `<p>To reach <b>${next.name}</b>: get to lesson ${next.from} (${Math.min(ctx.lessons, next.from)}/${next.from}) and tick off 2 ${TIERS[tier].name} goals (${Math.min(tierDone, 2)}/2).</p>
-        <div class="pencil-bar"><i style="width:${Math.round(100 * (Math.min(ctx.lessons / next.from, 1) + Math.min(tierDone / 2, 1)) / 2)}%"></i></div>`
-        : "<p>Top of the notebook. Time to write the next one.</p>"}
+    <header class="page-head"><p class="eyebrow">Goals</p><h1 class="display">From bedroom to open mic.</h1></header>
+    <section class="road" aria-label="Your levels">
+      ${TIERS.map((t, i) => `<div class="stop ${i < tier ? "past" : i === tier ? "here" : ""}" style="--i:${i}"><span class="node">${i < tier ? icon("check") : i === tier ? pick() : ""}</span><b>${t.name}</b><small>${i === 0 ? "from day one" : `lesson ${t.from}+`}</small>${i === tier ? `<span class="hand you">you are here</span>` : ""}</div>`).join("")}
     </section>
-    ${weak ? `<aside class="sticky blue weak"><b>Your journal says ${esc(weak.label.toLowerCase())} feels shakiest</b> (averaging ${weak.avg.toFixed(1)}/5).<p>${esc(weak.tip)}</p></aside>` : ""}
+    <div class="goals-top">
+      <section class="card level-card">
+        <p class="eyebrow">Current level</p>
+        <h2 class="display">${TIERS[tier].name}</h2>
+        ${next ? `<p>Next up: <b>${next.name}</b>. Reach lesson ${next.from} <span class="muted">(${Math.min(ctx.lessons, next.from)}/${next.from})</span> and tick off two ${TIERS[tier].name} goals <span class="muted">(${Math.min(tierDone, 2)}/2)</span>.</p>
+          <div class="bar lg"><i style="width:${pct}%"></i></div><p class="small muted">${pct}% of the way there</p>` : "<p>Top of the notebook. Time to write the next one.</p>"}
+      </section>
+      ${weak ? `<aside class="card weak"><span class="hand">a note from your journal</span><p><b>${esc(weak.label)}</b> has felt shakiest lately (averaging ${weak.avg.toFixed(1)}/5).</p><p class="muted">${esc(weak.tip)}</p></aside>`
+        : `<aside class="card weak"><span class="hand">a note from your journal</span><p>Rate a few lessons in your journal and I'll point out the area that needs most love.</p></aside>`}
     </div>
-    <section class="card">
-      <h2>Focus on these next</h2>
-      <div class="focus">${focus.map((g, i) => `<div class="sticky ${["yellow", "pink", "green"][i]}"><p>${esc(g.title)}</p><small>${AREAS[g.area]}</small>${g.auto ? "" : `<button class="btn small" data-act="goal-done" data-id="${g.id}">Done it!</button>`}</div>`).join("") || "<p>All clear. Pick your own next challenge!</p>"}</div>
+    <section class="focus-wrap">
+      <div class="card-head"><h2 class="display sm">Focus on these next</h2></div>
+      <div class="focus">${focus.map((g, i) => `<div class="card focus-card"><span class="big-n">${pad2(i + 1)}</span><p>${esc(g.title)}</p><div class="row between"><span class="chip">${AREAS[g.area]}</span>${g.auto ? `<span class="small muted">ticks itself</span>` : `<button class="btn sm primary" data-act="goal-done" data-id="${g.id}">${icon("check")} Done it</button>`}</div></div>`).join("") || "<p>All clear. Pick your own next challenge!</p>"}</div>
     </section>
     <div class="tiers">${TIERS.map((t, i) => `<section class="card tier ${i > tier ? "future" : ""}">
-      <h3>${t.name} ${i > tier ? `<small class="muted">unlocks around lesson ${t.from}</small>` : i === tier ? `<small class="hl">you are here</small>` : ""}</h3>
+      <div class="card-head"><h3>${t.name}</h3>${i > tier ? `<span class="small muted">unlocks around lesson ${t.from}</span>` : i === tier ? `<span class="badge today">You're here</span>` : `<span class="badge done">Cleared</span>`}</div>
       <ul class="goal-list">${GOALS.filter((g) => g.tier === i).map(goalItem).join("")}</ul>
     </section>`).join("")}</div>`;
 }
 
 // ---------- TAPES ----------
 let tapeFilter = "all";
+let nowPlaying = null; // { audio, btn }
+
 function renderTapes() {
   const list = liveSessions().sort((a, b) => b.date.localeCompare(a.date) || (b.completedAt || 0) - (a.completedAt || 0))
     .filter((x) => tapeFilter === "all" || x.recording);
   const firstTake = liveSessions().filter((x) => x.recording).sort((a, b) => a.date.localeCompare(b.date))[0];
+  const takes = liveSessions().filter((x) => x.recording).length;
   view.innerHTML = `
-    <section class="tapes-head">
-      <h1>Tapes &amp; notes</h1>
-      <p>Every lesson's take and journal entry, newest first. Proof you're getting better.</p>
-      <div class="row"><button class="btn small ${tapeFilter === "all" ? "" : "ghost"}" data-act="filter" data-f="all">Everything</button><button class="btn small ${tapeFilter === "rec" ? "" : "ghost"}" data-act="filter" data-f="rec">Just recordings</button></div>
-    </section>
-    <section class="polaroids">
-      ${list.map((x, i) => `<article class="polaroid" style="--tilt:${((i * 37) % 7) - 3}deg">
-        <div class="snap">${x.journal?.mood != null ? face(x.journal.mood, 56) : pickSvg("big")}
-          ${x.recording ? `<button class="btn small play" data-act="play" data-name="${esc(x.recording.name)}">▶ Play ${x.recording.secs ? `(${x.recording.secs}s)` : ""}</button>${firstTake && firstTake.id !== x.id ? `<button class="linkish small" data-act="play" data-name="${esc(firstTake.recording.name)}">vs. your first take</button>` : ""}` : `<span class="muted small">no recording</span>`}
-          <div class="player"></div>
+    <header class="page-head row between">
+      <div><p class="eyebrow">Tapes</p><h1 class="display">Proof you're getting better.</h1><p class="lead muted">${takes} take${takes === 1 ? "" : "s"} and every journal entry, newest first.</p></div>
+      <div class="seg-ctl filter"><button class="${tapeFilter === "all" ? "on" : ""}" data-act="filter" data-f="all">Everything</button><button class="${tapeFilter === "rec" ? "on" : ""}" data-act="filter" data-f="rec">Recordings</button></div>
+    </header>
+    <section class="tapes">
+      ${list.map((x, i) => `<article class="card tape-card" style="--i:${Math.min(i, 8)}">
+        <header>
+          <div><p class="eyebrow">${x.lesson != null ? lessonLabel(x.lesson) : "Free practice"}${x.guitar ? ` · ${esc(x.guitar)}` : ""}</p><h3 class="display sm">${esc(x.title || "Free practice")}</h3><span class="small muted">${prettyDate(x.date)}</span></div>
+          ${x.journal?.mood != null ? `<span class="mood-badge m${x.journal.mood}" title="${MOODS[x.journal.mood]}">${moodFace(x.journal.mood, 30)}</span>` : ""}
+        </header>
+        ${x.recording ? `<button class="wave-btn" data-act="play" data-name="${esc(x.recording.name)}" aria-label="Play recording"><span class="pb">${icon("play")}</span>${waveform(x.recording.name)}<span class="dur">${x.recording.secs ? mmss(x.recording.secs) : ""}</span></button>
+          ${firstTake && firstTake.id !== x.id ? `<button class="link small compare" data-act="play" data-name="${esc(firstTake.recording.name)}" data-compare="1">${icon("play")} Compare with your first take</button>` : ""}`
+          : `<div class="no-rec small muted">${icon("mic")} No recording this time</div>`}
+        <p class="player small muted" aria-live="polite"></p>
+        ${x.journal?.how ? `<blockquote>${esc(x.journal.how)}</blockquote>` : ""}
+        <div class="notes">
+          ${x.journal?.hard ? `<p><span class="tag hard">Hard</span> ${esc(x.journal.hard)}</p>` : ""}
+          ${x.journal?.win ? `<p><span class="tag win">Win</span> ${esc(x.journal.win)}</p>` : ""}
         </div>
-        <h3>${prettyDate(x.date)}</h3>
-        <p class="small"><b>${esc(x.title || "Free practice")}</b>${x.lesson != null ? ` · ${lessonLabel(x.lesson)}` : ""}${x.guitar ? ` · ${esc(x.guitar)}` : ""}</p>
-        ${x.journal?.how ? `<p class="hand">${esc(x.journal.how)}</p>` : ""}
-        ${x.journal?.hard ? `<p class="small"><span class="hl pink">Hard:</span> ${esc(x.journal.hard)}</p>` : ""}
-        ${x.journal?.win ? `<p class="small"><span class="hl green">Win:</span> ${esc(x.journal.win)}</p>` : ""}
-      </article>`).join("") || `<p class="muted">Nothing here yet. Finish a lesson and your first take shows up here.</p>`}
+      </article>`).join("") || `<div class="card empty">${icon("tape")}<p>Nothing here yet. Finish a lesson and your first take lands here.</p></div>`}
     </section>`;
 }
 
 async function playTape(btn) {
-  const player = btn.closest(".snap").querySelector(".player");
-  player.textContent = "Loading…";
+  const card = btn.closest(".tape-card");
+  const waveBtn = card.querySelector(".wave-btn");
+  const status = card.querySelector(".player");
+  if (nowPlaying?.btn === btn) {
+    if (nowPlaying.audio.paused) nowPlaying.audio.play(); else nowPlaying.audio.pause();
+    return;
+  }
+  stopTape();
+  status.textContent = "Loading…";
   try {
     const blob = await getAudio(btn.dataset.name);
-    if (!blob) { player.textContent = "Couldn't find that recording. It may not have synced from the device you made it on yet."; return; }
-    player.innerHTML = `<audio controls autoplay src="${URL.createObjectURL(blob)}"></audio>`;
-  } catch (e) { player.textContent = `Couldn't load it: ${e.message}`; }
+    if (!blob) { status.textContent = "Couldn't find that recording. It may not have synced from the device you made it on yet."; return; }
+    const audio = new Audio(URL.createObjectURL(blob));
+    nowPlaying = { audio, btn };
+    const target = btn.dataset.compare ? null : waveBtn;
+    status.textContent = btn.dataset.compare ? "Playing your first take…" : "";
+    const bars = target ? [...target.querySelectorAll(".wave i")] : [];
+    const light = (p) => { const n = Math.round(p * bars.length); bars.forEach((b, i) => b.classList.toggle("lit", i < n)); };
+    audio.addEventListener("timeupdate", () => { if (audio.duration && isFinite(audio.duration)) light(audio.currentTime / audio.duration); });
+    audio.addEventListener("play", () => { target?.classList.add("playing"); if (target) target.querySelector(".pb").innerHTML = icon("pause"); });
+    audio.addEventListener("pause", () => { target?.classList.remove("playing"); if (target) target.querySelector(".pb").innerHTML = icon("play"); });
+    audio.addEventListener("ended", () => { status.textContent = ""; light(0); stopTape(); });
+    await audio.play();
+  } catch (e) { status.textContent = `Couldn't play it: ${e.message}`; }
+}
+function stopTape() {
+  if (!nowPlaying) return;
+  nowPlaying.audio.pause();
+  URL.revokeObjectURL(nowPlaying.audio.src);
+  nowPlaying = null;
 }
 
 // ---------- SETTINGS ----------
 function renderSettings() {
   const st = store.settings;
   view.innerHTML = `
+    <header class="page-head"><p class="eyebrow">Settings</p><h1 class="display">Under the hood.</h1></header>
     <div class="cols settings-grid"><div class="col-main">
-    <section class="page card">
-      <div class="tape"></div>
-      <h1>Settings</h1>
-      <h2>Sync between devices</h2>
-      <p>Your log, journal and recordings are saved to a <b>private</b> GitHub repo, so your laptop and phone stay in step. You'll need a token on each device:</p>
-      <ol class="small steps">
-        <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → new fine-grained token</a>.</li>
-        <li>Name it “Guitar Hero (this device)”, and set expiration to 1 year.</li>
-        <li><b>Repository access:</b> Only select repositories → <code>guitar-hero-data</code>.</li>
-        <li><b>Permissions → Repository → Contents:</b> Read and write. Nothing else.</li>
-        <li>Generate it and paste it below. It's stored only in this browser.</li>
+    <section class="card">
+      <div class="card-head"><h2 class="display sm">${icon("cloud")} Sync between devices</h2><span class="badge ${configured() && store.sync.status === "ok" ? "done" : "off"}">${configured() ? (store.sync.status === "ok" ? "Connected" : "Set up") : "Not connected"}</span></div>
+      <p>Your log, journal and recordings live in a <b>private</b> GitHub repo, so your laptop and phone stay in step. Each device needs its own token:</p>
+      <ol class="steps-list">
+        <li>Open <a class="link" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → new fine-grained token ${icon("link")}</a></li>
+        <li>Name it “Guitar Hero (this device)” and set it to expire in 1 year.</li>
+        <li><b>Repository access:</b> only select <code>guitar-hero-data</code>.</li>
+        <li><b>Permissions → Contents:</b> Read and write. Nothing else.</li>
+        <li>Generate it and paste it below. It stays in this browser only.</li>
       </ol>
       <form id="sync-form" class="stack">
-        <label class="field">Data repo<input name="repo" value="${esc(st.repo)}" autocomplete="off" spellcheck="false"></label>
-        <label class="field">Token<input name="token" type="password" value="${esc(st.token)}" autocomplete="off" placeholder="github_pat_…"></label>
-        <div class="row"><button class="btn">Save &amp; test</button><button type="button" class="btn ghost" data-act="sync">Sync now</button>${st.token ? `<button type="button" class="btn ghost" data-act="disconnect">Forget token</button>` : ""}</div>
+        <label class="field"><span class="eyebrow">Data repo</span><input name="repo" value="${esc(st.repo)}" autocomplete="off" spellcheck="false"></label>
+        <label class="field"><span class="eyebrow">Token</span><input name="token" type="password" value="${esc(st.token)}" autocomplete="off" placeholder="github_pat_…"></label>
+        <div class="row"><button class="btn primary">Save &amp; test</button><button type="button" class="btn" data-act="sync">${icon("reset")} Sync now</button>${st.token ? `<button type="button" class="btn ghost" data-act="disconnect">Forget token</button>` : ""}</div>
         <p class="sync-msg small" data-status="${store.sync.status}">${configured() ? esc(store.sync.message || "") + (store.sync.lastSynced ? ` · last synced ${store.sync.lastSynced.toLocaleTimeString()}` : "") : "Not connected: everything stays on this device for now."}</p>
       </form>
     </section></div><div class="col-side">
     <section class="card">
-      <h2>Warm nudges by email</h2>
-      <p class="small">The data repo checks your log every weekday evening. If you're missing lessons or logging lots of excused days, it opens an issue that @mentions you, so GitHub sends you a notification and an email. Close the issue once you've read it.</p>
+      <h3>Warm nudges by email</h3>
+      <p class="small muted">Every weekday evening your data repo checks the log. If lessons are slipping, it opens an issue that @mentions you, so GitHub emails you. Close it once you've read it.</p>
     </section>
     <section class="card">
-      <h2>Your plan</h2>
-      <form id="start-form" class="row"><label class="field">Started on<input type="date" name="start" value="${store.state.startDate}"></label><button class="btn small ghost">Update</button></form>
-      <p class="small muted">Lessons on weekdays; weekends off. Minimum five a week, unless you're sick, on holiday or dealing with an emergency.</p>
+      <h3>Your plan</h3>
+      <form id="start-form" class="row end"><label class="field grow"><span class="eyebrow">Started on</span><input type="date" name="start" value="${store.state.startDate}"></label><button class="btn">Update</button></form>
+      <p class="small muted">Weekdays on, weekends off. Minimum five a week, unless you're sick, on holiday or dealing with an emergency.</p>
     </section>
     <section class="card">
-      <h2>Backup</h2>
-      <div class="row"><button class="btn ghost" data-act="export">Download backup (.json)</button><label class="btn ghost">Restore from backup<input type="file" accept="application/json" data-act="import" hidden></label></div>
+      <h3>Backup</h3>
+      <div class="row"><button class="btn" data-act="export">${icon("download")} Download</button><label class="btn">${icon("upload")} Restore<input type="file" accept="application/json" data-act="import" hidden></label></div>
       <p class="small muted">Backups hold your log and journal. Recordings live in the data repo and this browser.</p>
     </section></div></div>`;
 }
@@ -607,58 +732,69 @@ function renderSettings() {
 const ROUTES = { "": renderToday, lesson: renderLesson, tracker: renderTracker, goals: renderGoals, tapes: renderTapes, settings: renderSettings };
 const currentRoute = () => (location.hash.replace(/^#\/?/, "").split("/")[0]) || "";
 
-function render() {
+function render({ animate = false } = {}) {
   const r = currentRoute();
   if (r !== "lesson") stopAll();
+  if (r !== "tapes") stopTape();
+  if (r !== "") { unmountStrings?.(); unmountStrings = null; }
   (ROUTES[r] || renderToday)();
+  if (animate && !reducedMotion()) { view.classList.remove("enter"); void view.offsetWidth; view.classList.add("enter"); }
   renderNav(r);
   renderSync();
 }
 
-window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
+window.addEventListener("hashchange", () => { render({ animate: true }); window.scrollTo(0, 0); });
+window.addEventListener("resize", () => renderNav(currentRoute()));
 store.subscribe(() => { renderSync(); if (!["lesson", "settings"].includes(currentRoute())) render(); });
 
 view.addEventListener("click", async (e) => {
   const el = e.target.closest("[data-act]");
   if (!el) return;
-  const a = el.dataset.act, s = store.state;
+  const a = el.dataset.act;
+  const lessonStep = (fn) => { fn(); saveRun(); render({ animate: true }); window.scrollTo(0, 0); };
   switch (a) {
-    case "guitar": lessonRun.guitar = el.dataset.g; lessonRun.step = 1; saveRun(); renderLesson(); window.scrollTo(0, 0); break;
+    case "guitar": lessonStep(() => { lessonRun.guitar = el.dataset.g; lessonRun.step = 1; }); break;
     case "next":
       if (el.hasAttribute("data-needs-take") && !confirm("No take recorded yet. Skip the recording this time?")) return;
-      if (el.hasAttribute("data-needs-take")) pendingTake = { skipped: true };
-      lessonRun.step++; saveRun(); renderLesson(); window.scrollTo(0, 0); break;
-    case "prev":
-      if (lessonRun.step > 0) lessonRun.step--;
-      saveRun(); renderLesson(); window.scrollTo(0, 0); break;
+      lessonStep(() => { if (el.hasAttribute("data-needs-take")) pendingTake = { skipped: true }; lessonRun.step++; });
+      break;
+    case "prev": lessonStep(() => { if (lessonRun.step > 0) lessonRun.step--; }); break;
     case "timer": {
       const box = $(".timer");
-      if (!timer) timer = { left: Number(box.dataset.total), running: false };
+      if (!timer) timer = { left: Number(box.dataset.total), total: Number(box.dataset.total), running: false };
       if (timer.left === 0) return;
       timer.running = !timer.running;
       if (timer.running) timer.handle = setInterval(tickTimer, 1000); else clearInterval(timer.handle);
-      el.textContent = timer.running ? "Pause" : "Resume";
+      box.classList.toggle("running", timer.running);
+      el.innerHTML = timer.running ? `${icon("pause")} <span>Pause</span>` : `${icon("play")} <span>Resume</span>`;
       break;
     }
     case "timer-reset": {
       if (timer?.handle) clearInterval(timer.handle);
-      timer = null;
       const box = $(".timer"), total = Number(box.dataset.total);
-      box.classList.remove("ding");
-      $(".timer .clock").textContent = `${Math.floor(total / 60)}:00`;
-      $("[data-act=timer]").textContent = "Start timer";
+      timer = null;
+      box.classList.remove("ding", "running");
+      $(".timer .clock").textContent = mmss(total);
+      $(".timer .prog").style.strokeDashoffset = 0;
+      $("[data-act=timer]").innerHTML = `${icon("play")} <span>Start</span>`;
       break;
     }
-    case "metro": metro.toggle(); el.textContent = metro.running ? "■ Stop" : "▶ Metronome"; if (!metro.running) $$(".beats i").forEach((i) => i.classList.remove("on")); break;
+    case "metro":
+      metro.toggle();
+      el.innerHTML = metro.running ? `${icon("stop")} <span>Stop click</span>` : `${icon("play")} <span>Start click</span>`;
+      el.classList.toggle("primary", metro.running);
+      if (!metro.running) $$(".beats i").forEach((i) => i.classList.remove("on"));
+      break;
     case "bpm": metro.bpm = Math.min(220, Math.max(30, metro.bpm + Number(el.dataset.d))); $(".bpm output").textContent = metro.bpm; break;
     case "rec": toggleRecord(el); break;
     case "retake": if (pendingTake?.url) URL.revokeObjectURL(pendingTake.url); pendingTake = null; renderLesson(); break;
-    case "skip-rec": pendingTake = { skipped: true }; lessonRun.step++; saveRun(); renderLesson(); break;
+    case "skip-rec": lessonStep(() => { pendingTake = { skipped: true }; lessonRun.step++; }); break;
+    case "sound": setSound(!soundOn()); el.innerHTML = icon(soundOn() ? "volume" : "volumeOff"); el.title = soundOn() ? "Mute" : "Unmute"; el.setAttribute("aria-label", soundOn() ? "Mute the strings" : "Unmute the strings"); break;
     case "day": selected = el.dataset.date; renderTracker(); break;
     case "month": { const d = new Date(cal.y, cal.m + Number(el.dataset.d), 1); cal = { y: d.getFullYear(), m: d.getMonth() }; renderTracker(); break; }
     case "excuse": update((st) => { st.excuses[el.dataset.date] = stamp({ reason: el.dataset.reason }); }); break;
     case "unexcuse": update((st) => { st.excuses[el.dataset.date] = stamp({ deleted: true }); }); break;
-    case "shift": update((st) => { st.shifts[el.dataset.from] = stamp({ to: el.dataset.to }); }); selected = el.dataset.to; break;
+    case "shift": selected = el.dataset.to; update((st) => { st.shifts[el.dataset.from] = stamp({ to: el.dataset.to }); }); break;
     case "unshift": update((st) => { st.shifts[el.dataset.from] = stamp({ deleted: true }); }); break;
     case "logfree": {
       const id = uid();
@@ -666,7 +802,7 @@ view.addEventListener("click", async (e) => {
       break;
     }
     case "goal-done": update((st) => { st.goals[el.dataset.id] = stamp({ done: true, date: today() }); }); break;
-    case "filter": tapeFilter = el.dataset.f; renderTapes(); break;
+    case "filter": tapeFilter = el.dataset.f; stopTape(); renderTapes(); break;
     case "play": playTape(el); break;
     case "sync": syncNow(); break;
     case "disconnect": saveSettings({ token: "" }); store.sync = { status: "off", message: "", lastSynced: null }; renderSettings(); break;
@@ -697,6 +833,7 @@ view.addEventListener("submit", async (e) => {
     const msg = f.querySelector(".sync-msg");
     saveSettings({ repo: f.repo.value.trim(), token: f.token.value.trim() });
     msg.textContent = "Testing…";
+    msg.dataset.status = "syncing";
     try {
       const name = await testConnection();
       msg.dataset.status = "ok";
@@ -710,8 +847,20 @@ view.addEventListener("submit", async (e) => {
   }
 });
 
+// header wiring
+for (const a of document.querySelectorAll("nav a[data-icon]")) a.insertAdjacentHTML("afterbegin", icon(a.dataset.icon));
 document.getElementById("sync").addEventListener("click", () => { location.hash = "#/settings"; });
+document.getElementById("theme").addEventListener("click", () => {
+  const next = effectiveTheme() === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("gh.theme", next); } catch {}
+  renderThemeBtn();
+});
+addEventListener("scroll", () => document.body.classList.toggle("scrolled", scrollY > 8), { passive: true });
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncNow(); });
 
-render();
+renderThemeBtn();
+render({ animate: true });
 syncNow();
+// Fonts change tab widths once they load; re-measure the sliding nav indicator.
+document.fonts?.ready.then(() => renderNav(currentRoute()));

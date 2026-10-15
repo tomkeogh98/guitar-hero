@@ -1,4 +1,4 @@
-import { addDays, daysBetween, mondayOf, today, weekday } from "./util.js?v=3";
+import { addDays, daysBetween, mondayOf, today, weekday } from "./util.js?v=4";
 
 export const REASONS = {
   sick: { label: "Sick", mark: "S" },

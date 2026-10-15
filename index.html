@@ -2,33 +2,47 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Guitar Hero · Tom's practice notebook</title>
   <meta name="description" content="Tom's guitar practice notebook: daily lessons, tracker, goals and recordings.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1C19 1 23 5 23 10C23 17 16 23 12 23C8 23 1 17 1 10C1 5 5 1 12 1Z' fill='%23ff6b4a' stroke='%2323305a' stroke-width='1.5'/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#F3EEE4" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F0E0C" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1.5C18.6 1.5 22.5 5 22.5 9.6C22.5 15.8 15.6 22.5 12 22.5C8.4 22.5 1.5 15.8 1.5 9.6C1.5 5 5.4 1.5 12 1.5Z' fill='%23FF4F1F'/%3E%3C/svg%3E">
+  <script>
+    // Apply the saved theme before first paint to avoid a flash.
+    try { const t = localStorage.getItem("gh.theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Kalam:wght@400;700&family=Courier+Prime&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..800,0..100,0..1;1,9..144,300..800,0..100,0..1&family=Instrument+Sans:wght@400..700&family=JetBrains+Mono:wght@400;500;600&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=4">
 </head>
 <body>
+  <a class="skip" href="#view">Skip to content</a>
   <header class="top">
-    <a class="brand" href="#/">
-      <svg viewBox="0 0 24 24" class="brand-pick" aria-hidden="true"><path d="M12 1C19 1 23 5 23 10C23 17 16 23 12 23C8 23 1 17 1 10C1 5 5 1 12 1Z"/></svg>
-      Guitar Hero<small>Tom's practice notebook</small>
-    </a>
-    <button id="sync" class="sync" type="button" data-status="off"><i></i><span>local only</span></button>
-    <nav aria-label="Main">
-      <a href="#/">Today</a>
-      <a href="#/tracker">Tracker</a>
-      <a href="#/goals">Goals</a>
-      <a href="#/tapes">Tapes</a>
-      <a href="#/settings">Settings</a>
-    </nav>
+    <div class="top-inner">
+      <a class="brand" href="#/" aria-label="Guitar Hero home">
+        <svg viewBox="0 0 24 24" class="brand-pick" aria-hidden="true"><path d="M12 1.5C18.6 1.5 22.5 5 22.5 9.6C22.5 15.8 15.6 22.5 12 22.5C8.4 22.5 1.5 15.8 1.5 9.6C1.5 5 5.4 1.5 12 1.5Z"/></svg>
+        <span class="brand-name">Guitar Hero</span>
+        <span class="brand-sub">Tom's practice notebook</span>
+      </a>
+      <nav aria-label="Main" id="nav">
+        <span class="nav-ink" aria-hidden="true"></span>
+        <a href="#/" data-icon="today">Today</a>
+        <a href="#/tracker" data-icon="calendar">Tracker</a>
+        <a href="#/goals" data-icon="target">Goals</a>
+        <a href="#/tapes" data-icon="tape">Tapes</a>
+        <a href="#/settings" data-icon="sliders">Settings</a>
+      </nav>
+      <div class="top-tools">
+        <button id="sync" class="chip sync" type="button" data-status="off"><i></i><span>local only</span></button>
+        <button id="theme" class="icon-btn" type="button" aria-label="Switch light or dark mode"></button>
+      </div>
+    </div>
   </header>
   <main id="view" tabindex="-1"></main>
-  <footer class="foot">Keep it fun. Free play is always allowed.</footer>
-  <noscript><p class="page card">This notebook needs JavaScript switched on.</p></noscript>
-  <script type="module" src="js/app.js?v=3"></script>
+  <footer class="foot"><span>Keep it fun.</span> Free play is always allowed.</footer>
+  <noscript><p class="card">This notebook needs JavaScript switched on.</p></noscript>
+  <script type="module" src="js/app.js?v=4"></script>
 </body>
 </html>
