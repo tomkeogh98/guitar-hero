@@ -1,12 +1,12 @@
 // State lives in localStorage (works offline) and syncs to data.json in a private GitHub repo.
 // Recordings are cached in IndexedDB and uploaded to recordings/ in the same repo.
-import { today } from "./util.js?v=4";
+import { today } from "./util.js?v=5";
 
 const STATE_KEY = "gh.state.v1";
 const SETTINGS_KEY = "gh.settings.v1";
 const DEFAULT_REPO = "tomkeogh98/guitar-hero-data";
 
-const blank = () => ({ version: 1, startDate: null, sessions: {}, excuses: {}, shifts: {}, goals: {} });
+const blank = () => ({ version: 1, startDate: null, sessions: {}, excuses: {}, shifts: {}, goals: {}, prefs: {} });
 
 function readJSON(key, fallback) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
@@ -63,6 +63,7 @@ export function merge(local, remote) {
     excuses: mergeMap(local.excuses, remote.excuses),
     shifts: mergeMap(local.shifts, remote.shifts),
     goals: mergeMap(local.goals, remote.goals),
+    prefs: mergeMap(local.prefs, remote.prefs),
   };
 }
 

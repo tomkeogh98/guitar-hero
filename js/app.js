@@ -1,12 +1,14 @@
-import { AREAS, BLOCKS, LESSON_COUNT, WEEKS, getLesson, lessonLabel } from "./curriculum.js?v=4";
-import { greet } from "./greetings.js?v=4";
-import { GOALS, TIERS, context, currentTier, focusGoals, isDone, recordBestStreak, weakestArea } from "./goals.js?v=4";
-import { REASONS, dayStatus, excuseOn, nudgeCheck, practisedOn, sessionsOn, shiftTargets, streak, weekSummary } from "./schedule.js?v=4";
-import { configured, exportJSON, getAudio, importJSON, putAudio, saveSettings, stamp, store, syncNow, testConnection, update } from "./store.js?v=4";
-import { Metronome, chime, extFor, recordingSupported, startRecording } from "./audio.js?v=4";
-import { addDays, daysBetween, dayName, esc, fmt, monthName, mondayOf, parse, pickRandom, prettyDate, reducedMotion, shortDay, today, uid, weekday } from "./util.js?v=4";
-import { icon, moodFace, pick } from "./icons.js?v=4";
-import { countUps, mountStrings, setSound, soundOn, splitWords, stringsMarkup, waveform } from "./fx.js?v=4";
+import { AREAS, BLOCKS, LESSON_COUNT, WEEKS, getLesson, lessonLabel } from "./curriculum.js?v=5";
+import { greet } from "./greetings.js?v=5";
+import { GOALS, TIERS, context, currentTier, focusGoals, isDone, recordBestStreak, weakestArea } from "./goals.js?v=5";
+import { REASONS, dayStatus, excuseOn, nudgeCheck, practisedOn, sessionsOn, shiftTargets, streak, weekSummary } from "./schedule.js?v=5";
+import { configured, exportJSON, getAudio, importJSON, putAudio, saveSettings, stamp, store, syncNow, testConnection, update } from "./store.js?v=5";
+import { Metronome, chime, extFor, recordingSupported, startRecording } from "./audio.js?v=5";
+import { addDays, daysBetween, dayName, esc, fmt, monthName, mondayOf, parse, pickRandom, prettyDate, reducedMotion, shortDay, today, uid, weekday } from "./util.js?v=5";
+import { icon, moodFace, pick } from "./icons.js?v=5";
+import { countUps, mountStrings, setSound, soundOn, splitWords, stringsMarkup, waveform } from "./fx.js?v=5";
+import { handInfo } from "./hands.js?v=5";
+import { openTuner } from "./tuner.js?v=5";
 
 const view = document.getElementById("view");
 const $ = (sel, root = view) => root.querySelector(sel);
@@ -29,6 +31,10 @@ function tally(n) {
 const firstSentence = (t) => (t.match(/^.*?[.!?](\s|$)/) || [t])[0].trim();
 const liveSessions = () => Object.values(store.state.sessions).filter((s) => !s.deleted);
 const lessonsDone = () => liveSessions().filter((s) => s.lesson != null).length;
+// "Find your level" shifts where the course picks up; lessons you've done stay logged.
+const placement = () => store.state.prefs?.placement?.value || 0;
+const nextIndex = () => Math.max(0, lessonsDone() + placement());
+const lastLevels = (n) => liveSessions().filter((x) => x.lesson != null).sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0)).slice(0, n).map((x) => x.journal?.level);
 const statusIcon = { done: "check", missed: "x" };
 
 // ---------- header ----------
@@ -43,7 +49,7 @@ function renderNav(route) {
   const nav = document.getElementById("nav");
   let active = null;
   for (const a of nav.querySelectorAll("a")) {
-    const on = a.getAttribute("href") === `#/${route}` || (route === "lesson" && a.getAttribute("href") === "#/");
+    const on = a.getAttribute("href") === `#/${route}` || (["lesson", "level"].includes(route) && a.getAttribute("href") === "#/");
     a.classList.toggle("on", on);
     if (on) { a.setAttribute("aria-current", "page"); active = a; } else a.removeAttribute("aria-current");
   }
@@ -98,13 +104,17 @@ function renderToday() {
   }
   const nudge = nudgeCheck(s);
   const wk = weekSummary(s, now);
-  const lesson = getLesson(done);
+  const idx = nextIndex();
+  const lesson = getLesson(idx);
+  const recent = lastLevels(2);
+  const tooEasy = recent.length === 2 && recent.every((l) => l === "easy");
+  const tooHard = recent.length === 2 && recent.every((l) => l === "hard");
   const todays = sessionsOn(s, now).filter((x) => x.lesson != null);
   const best = Math.max(str, s.goals["_best-streak"]?.value || 0);
 
   const timeline = BLOCKS.map((b) => `<span class="seg seg-${b.key}" style="--m:${b.mins}" title="${b.label}: ${b.mins} min"></span>`).join("");
   const setlist = BLOCKS.map((b, i) => `<li class="seg-${b.key}"><span class="n">${pad2(i + 1)}</span>
-      <div><b>${b.label}</b><p>${b.key === "free" ? "Anything you like. This is the fun bit." : b.key === "rec" ? esc(lesson.blocks.rec) : esc(firstSentence(lesson.blocks[b.key]))}</p></div>
+      <div><b>${b.label}</b>${b.key === "free" ? "" : `<span class="tool-tag t-${handInfo(lesson.week, lesson.day, b.key, lesson.blocks[b.key], "electric").tool}">${handInfo(lesson.week, lesson.day, b.key, lesson.blocks[b.key], "electric").toolLabel}</span>`}<p>${b.key === "free" ? "Anything you like. This is the fun bit." : b.key === "rec" ? esc(lesson.blocks.rec) : esc(firstSentence(lesson.blocks[b.key]))}</p></div>
       <span class="m">${b.mins}′</span></li>`).join("");
 
   let recap;
@@ -124,7 +134,7 @@ function renderToday() {
       <p class="eyebrow">Today · done</p>
       <h2 class="display">That's today in the bag.</h2>
       ${t ? `<p class="lead">You played <b>${esc(t.title)}</b> on the ${esc(t.guitar)}.${t.journal?.win ? ` Today's win: <q>${esc(t.journal.win)}</q>` : ""}</p>` : `<p class="lead">Practice logged. Nice one.</p>`}
-      <p class="muted">Up next: <b>${esc(lesson.title)}</b> · ${lessonLabel(done)}</p>
+      <p class="muted">Up next: <b>${esc(lesson.title)}</b> · ${lessonLabel(idx)}</p>
       <div class="row"><a class="btn" href="#/tapes">${icon("tape")} Listen back</a><a class="btn ghost" href="#/lesson">Fancy another? Do the next one ${icon("arrowRight")}</a></div>
     </section>`;
   } else if (st === "excused") {
@@ -142,14 +152,14 @@ function renderToday() {
       <p class="eyebrow">Today · day off</p>
       <h2 class="display">Rest is part of the practice.</h2>
       <p class="lead">No lesson today. Your brain keeps sorting out what you've learnt while you're away from the guitar.</p>
-      <p class="muted">Up next: <b>${esc(lesson.title)}</b> · ${lessonLabel(done)}</p>
+      <p class="muted">Up next: <b>${esc(lesson.title)}</b> · ${lessonLabel(idx)}</p>
       <div class="row"><a class="btn ghost" href="#/lesson">Itching to play? Do it now ${icon("arrowRight")}</a></div>
     </section>`;
   } else {
     planCard = `<section class="card plan">
       <header class="plan-head">
         <div>
-          <p class="eyebrow">${lessonLabel(done)} · ${esc(lesson.weekTitle)}</p>
+          <p class="eyebrow">${lessonLabel(idx)} · ${esc(lesson.weekTitle)}</p>
           <h2 class="display">${esc(lesson.title)}</h2>
         </div>
         <div class="plan-time"><b>30</b><span>min</span></div>
@@ -159,7 +169,8 @@ function renderToday() {
       <div class="recap">${recap}</div>
       <footer class="plan-foot">
         <a class="btn primary lg" href="#/lesson">Start today's lesson ${icon("arrowRight")}</a>
-        <span class="hand">electric or acoustic, your call</span>
+        <button class="btn ghost" data-act="tuner">${icon("fork")} Tune up</button>
+        <a class="link small level-link" href="#/level">${icon("compass")} Too easy? Find your level</a>
       </footer>
     </section>`;
   }
@@ -181,7 +192,7 @@ function renderToday() {
       <div class="stats">
         <div class="stat"><span class="stat-icon flame">${icon("flame")}</span><b data-count="${str}">${str}</b><span class="stat-label">day streak</span><span class="stat-foot">best ${best}</span></div>
         <div class="stat"><div class="ring-wrap">${weekRing(wk.practised, Math.max(wk.required, 1))}<b>${wk.practised}</b></div><span class="stat-label">of ${Math.max(wk.required, 1)} this week</span><span class="stat-foot">${wk.onTrack ? "on track" : "behind"}</span></div>
-        <div class="stat"><span class="stat-icon">${icon("note")}</span><b data-count="${done}">${done}</b><span class="stat-label">lessons done</span><span class="bar"><i style="width:${Math.min(100, (done / LESSON_COUNT) * 100)}%"></i></span></div>
+        <div class="stat"><span class="stat-icon">${icon("note")}</span><b data-count="${done}">${done}</b><span class="stat-label">lessons done</span><span class="bar" title="Lesson ${idx + 1} of ${LESSON_COUNT}"><i style="width:${Math.min(100, (idx / LESSON_COUNT) * 100)}%"></i></span></div>
       </div>
       <div class="strings-wrap">
         ${stringsMarkup()}
@@ -189,6 +200,8 @@ function renderToday() {
         <button class="icon-btn sound" data-act="sound" aria-label="${soundOn() ? "Mute the strings" : "Unmute the strings"}" title="${soundOn() ? "Mute" : "Unmute"}">${icon(soundOn() ? "volume" : "volumeOff")}</button>
       </div>
     </section>
+    ${tooEasy && st !== "done" ? `<aside class="nudge level-nudge" role="status"><span class="nudge-icon">${icon("compass")}</span><div><b>Feeling too easy?</b><p>Your last two lessons felt too easy. Jump ahead to the week that matches your playing.</p><a class="btn sm primary" href="#/level">Find your level ${icon("arrowRight")}</a></div></aside>` : ""}
+    ${tooHard && st !== "done" ? `<aside class="nudge level-nudge" role="status"><span class="nudge-icon">${icon("heart")}</span><div><b>Two tough ones in a row</b><p>That's normal. Today, drop every metronome setting by 10 bpm and aim for clean rather than fast. It'll click.</p></div></aside>` : ""}
     ${nudge ? `<aside class="nudge" role="status"><span class="nudge-icon">${icon("heart")}</span><div><b>A warm nudge</b><p>${esc(pickRandom(NUDGES[nudge.kind]).replace("{n}", nudge.count).replace("{s}", nudge.count === 1 ? "" : "s"))}</p></div></aside>` : ""}
     <div class="cols today-grid">
       <div class="col-main">${planCard}</div>
@@ -227,7 +240,7 @@ function stopAll() {
 }
 
 function ensureRun() {
-  const idx = lessonsDone();
+  const idx = nextIndex();
   if (!lessonRun) { try { lessonRun = JSON.parse(sessionStorage.getItem(LESSON_KEY)); } catch {} }
   if (!lessonRun || lessonRun.index !== idx) {
     lessonRun = { index: idx, guitar: null, step: 0, startedAt: Date.now() };
@@ -282,6 +295,10 @@ function renderLesson() {
         <button class="guitar-card" data-act="guitar" data-g="electric">${guitarArt("electric")}<b>Electric</b><span>Bends, palm muting, amp tone</span></button>
         <button class="guitar-card" data-act="guitar" data-g="acoustic">${guitarArt("acoustic")}<b>Acoustic</b><span>Strumming, projection, pick position</span></button>
       </div>
+      <div class="prep">
+        <button class="btn" data-act="tuner">${icon("fork")} Tune up first</button>
+        <p class="small muted">${pick("inline-pick")} Have a plectrum handy. Most exercises use one, and every section tells you whether it's plectrum or fingers.</p>
+      </div>
       <p class="builds"><span class="hand">builds on</span> ${esc(L.buildsOn)}</p>
     </section>`;
     return;
@@ -291,6 +308,8 @@ function renderLesson() {
     const b = BLOCKS[step - 1];
     const text = L.blocks[b.key];
     const showMetro = ["w", "x", "r", "s"].includes(b.key);
+    const h = handInfo(L.week, L.day, b.key, text, guitar);
+    const handBar = `<div class="hand-bar t-${h.tool}"><span class="hb-tool">${h.toolIcon === "pick" ? pick("hb-pick") : icon(h.toolIcon)}<b>${h.toolLabel}</b></span><span class="hb-how"><b>${h.label}.</b> ${esc(h.how)}</span></div>`;
     let body = `<p class="block-text">${esc(text)}</p>`;
     if (b.key === "x" && L.tab) body += `<figure class="tab-card"><figcaption class="eyebrow">Tab</figcaption><pre class="tab">${esc(L.tab)}</pre></figure>`;
     if (b.key === "x") body += `<aside class="tone"><span class="hand">tone &amp; taste · ${esc(guitar)}</span><p>${esc(L.tone)}</p></aside>`;
@@ -302,6 +321,7 @@ function renderLesson() {
         <article class="card block seg-${b.key}">
           <p class="eyebrow"><span class="step-n">${pad2(step)}</span> ${b.mins} min</p>
           <h2 class="display block-title">${b.label}</h2>
+          ${handBar}
           ${body}
         </article>
         <aside class="tools">
@@ -326,6 +346,9 @@ function renderLesson() {
           <fieldset class="moods"><legend class="eyebrow">Overall feel</legend>
             <div class="mood-row">${MOODS.map((m, i) => `<label class="mood"><input type="radio" name="mood" value="${i}" ${i === 3 ? "checked" : ""}>${moodFace(i, 34)}<span>${m}</span></label>`).join("")}</div>
           </fieldset>
+          <fieldset class="levelq"><legend class="eyebrow">How was the level?</legend>
+            <div class="seg-ctl wide">${[["easy", "Too easy"], ["right", "Just right"], ["hard", "Too hard"]].map(([v, l]) => `<label><input type="radio" name="level" value="${v}" ${v === "right" ? "checked" : ""}><b>${l}</b></label>`).join("")}</div>
+          </fieldset>
           <fieldset class="ratings"><legend class="eyebrow">How solid did each area feel?</legend>
             ${L.areas.map((a) => `<div class="rate"><span>${AREAS[a]}</span><div class="seg-ctl">${[1, 2, 3, 4, 5].map((v) => `<label><input type="radio" name="r-${a}" value="${v}" ${v === 3 ? "checked" : ""}><b>${v}</b></label>`).join("")}</div></div>`).join("")}
             <p class="scale small muted"><span>shaky</span><span>nailed it</span></p>
@@ -342,21 +365,48 @@ function renderLesson() {
   </section>`;
 }
 
+// Proper little guitars. Frets follow a real scale length (rule of 18-ish via 2^(n/12)).
 function guitarArt(kind) {
-  const strings = Array.from({ length: 6 }, (_, i) => `<path class="gs" d="M${kind === "electric" ? 36 : 40} ${36.5 + i * 1.4} L190 ${36.5 + i * 1.4}"/>`).join("");
-  return kind === "electric"
-    ? `<svg viewBox="0 0 200 80" class="g-art" aria-hidden="true">
-        <path class="body" d="M18 40C17 24 29 13 43 18c7-9 23-9 28 1 8 3 11 12 8 19 4 7 2 17-6 20-5 9-21 9-28 1C30 66 19 56 18 40z"/>
-        <rect class="neck" x="78" y="35" width="98" height="10" rx="2"/>
-        <path class="head" d="M176 33.5l18-5 2 22-20-4.5z"/>
-        <rect class="hw" x="44" y="33" width="5" height="14" rx="1.5"/><rect class="hw" x="56" y="33" width="5" height="14" rx="1.5"/><rect class="hw" x="30" y="34" width="4" height="12" rx="1"/>
-        ${strings}<circle class="knob" cx="40" cy="56" r="3"/><circle class="knob" cx="50" cy="59" r="3"/></svg>`
-    : `<svg viewBox="0 0 200 80" class="g-art" aria-hidden="true">
-        <path class="body" d="M14 40C13 20 33 13 46 22c6-5 16-6 22 1 13-8 26 3 26 17s-13 25-26 17c-6 7-16 6-22 1C33 67 13 60 14 40z"/>
-        <circle class="hole" cx="66" cy="40" r="9"/>
-        <rect class="neck" x="92" y="35" width="84" height="10" rx="2"/>
-        <path class="head" d="M176 33.5l18-3.5v20l-18-3.5z"/>
-        <rect class="hw" x="34" y="34" width="5" height="12" rx="1.5"/>${strings}</svg>`;
+  const E = kind === "electric";
+  const nut = 208, bridge = E ? 50 : 38, L = nut - bridge, heel = E ? 114 : 118;
+  const fx = (n) => nut - L * (1 - Math.pow(2, -n / 12));
+  const frets = [];
+  for (let n = 1; fx(n) > heel + 1; n++) frets.push(n);
+  const fretLines = frets.map((n) => `<line x1="${fx(n).toFixed(1)}" y1="40.2" x2="${fx(n).toFixed(1)}" y2="49.8"/>`).join("");
+  const dot = (n, y = 45) => { const x = (fx(n) + fx(n - 1)) / 2; return `<circle cx="${x.toFixed(1)}" cy="${y}" r="1.1"/>`; };
+  const inlays = [3, 5, 7, 9].filter((n) => frets.includes(n)).map((n) => dot(n)).join("") + (frets.includes(12) ? dot(12, 42.6) + dot(12, 47.4) : "");
+  const strings = Array.from({ length: 6 }, (_, i) => `<line x1="${E ? 40 : 38}" y1="${41.2 + i * 1.52}" x2="${E ? 214 : 212}" y2="${41.9 + i * 1.24}" style="stroke-width:${(0.35 + i * 0.09).toFixed(2)}"/>`).join("");
+  const tuners = [214, 222, 230].map((x) => `<circle cx="${x}" cy="${E ? 34.5 : 34}" r="2.3"/><circle cx="${x}" cy="${E ? 56 : 56.5}" r="2.3"/>`).join("");
+  const id = `g-${kind}`;
+  if (E) return `<svg viewBox="0 0 244 90" class="g-art" aria-hidden="true">
+    <defs><radialGradient id="${id}" cx="0.4" cy="0.5" r="0.62"><stop offset="0" stop-color="#FFC15E"/><stop offset="0.42" stop-color="#E5531B"/><stop offset="0.8" stop-color="#9A1D0C"/><stop offset="1" stop-color="#3B0B05"/></radialGradient></defs>
+    <path class="ga-shadow" d="M118 41C114 29 102 22 90 23 82 24 78 28 70 28 60 28 54 18 38 18 20 18 10 32 10 48S20 78 38 78C54 78 60 69 70 69 80 69 84 73 94 73 104 73 108 67 106 61 105 57 110 55 118 55Z"/>
+    <path d="M116 38C112 26 100 19 88 20 80 21 76 25 68 25 58 25 52 15 36 15 18 15 8 29 8 45S18 75 36 75C52 75 58 66 68 66 78 66 82 70 92 70 102 70 106 64 104 58 103 54 108 52 116 52Z" fill="url(#${id})" stroke="#F3E6CC" stroke-width="1.6"/>
+    <rect x="108" y="39.6" width="102" height="10.8" rx="1.5" fill="#3A2417"/>
+    <g class="ga-frets">${fretLines}</g><g class="ga-inlay">${inlays}</g>
+    <path d="M207 39.4C214 36.5 224 33.5 233 32.4 237 32 239 34.6 238.6 38L237 52.4C236.6 56 233.6 58 230 57.6 222 56.6 214 54.4 207 50.6Z" fill="#1E1611"/>
+    <g class="ga-tuners">${tuners}</g>
+    <rect x="58" y="36" width="9.5" height="18" rx="2" class="ga-pickup"/><rect x="80" y="36" width="9.5" height="18" rx="2" class="ga-pickup"/>
+    <g class="ga-poles">${[58, 80].map((x) => Array.from({ length: 6 }, (_, i) => `<circle cx="${x + 2.8}" cy="${38.4 + i * 2.65}" r=".7"/><circle cx="${x + 6.7}" cy="${38.4 + i * 2.65}" r=".7"/>`).join("")).join("")}</g>
+    <rect x="48.5" y="37" width="3" height="16" rx="1" class="ga-metal"/><rect x="38.5" y="36" width="4.5" height="18" rx="2" class="ga-metal"/>
+    <g class="ga-strings">${strings}</g>
+    ${[[27, 58], [39, 63], [31, 68], [44, 69]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.2" class="ga-knob"/>`).join("")}
+    <circle cx="96" cy="64" r="1.6" class="ga-metal"/>
+  </svg>`;
+  return `<svg viewBox="0 0 244 90" class="g-art" aria-hidden="true">
+    <defs><radialGradient id="${id}" cx="0.45" cy="0.5" r="0.6"><stop offset="0" stop-color="#F6E1B2"/><stop offset="0.6" stop-color="#E2B36A"/><stop offset="0.88" stop-color="#A86A2C"/><stop offset="1" stop-color="#5A3214"/></radialGradient></defs>
+    <path class="ga-shadow" d="M120 36C120 26 110 20 98 20 88 20 82 27 72 27 62 27 54 15 36 15 18 15 8 30 8 48S18 81 36 81C54 81 62 69 72 69 82 69 88 76 98 76 110 76 120 70 120 60Z"/>
+    <path d="M118 33C118 23 108 17 96 17 86 17 80 24 70 24 60 24 52 12 34 12 16 12 6 27 6 45S16 78 34 78C52 78 60 66 70 66 80 66 86 73 96 73 108 73 118 67 118 57Z" fill="url(#${id})" stroke="#F7EEDC" stroke-width="1.6"/>
+    <path d="M86 52C90 61 102 64 109 58 108 53 102 52 97 54Z" fill="#3B2112" opacity=".85"/>
+    <circle cx="96" cy="45" r="12.2" fill="none" stroke="#7A4A22" stroke-width="1.2"/><circle cx="96" cy="45" r="10.6" fill="none" stroke="#F7EEDC" stroke-width=".8"/>
+    <circle cx="96" cy="45" r="9" fill="#1C120B"/>
+    <rect x="114" y="39.6" width="96" height="10.8" rx="1.5" fill="#3A2417"/>
+    <g class="ga-frets">${fretLines}</g><g class="ga-inlay">${inlays}</g>
+    <path d="M207 38.6L232 35C236 34.6 238 36.6 238 40V50C238 53.4 236 55.4 232 55L207 51.4Z" fill="#2A1A10"/>
+    <g class="ga-tuners">${tuners}</g>
+    <rect x="31" y="33" width="9" height="24" rx="3.5" fill="#2A1A10"/><rect x="36.4" y="36" width="1.4" height="18" rx=".7" fill="#F2EAD8"/>
+    <g class="ga-strings">${strings}</g>
+  </svg>`;
 }
 
 function bindMetro(bpm) {
@@ -445,7 +495,7 @@ async function saveJournal(form) {
     s.sessions[id] = stamp({
       id, date, lesson: lessonRun.index, title: L.title, guitar: lessonRun.guitar,
       startedAt: lessonRun.startedAt, completedAt: Date.now(), recording,
-      journal: { mood: Number(fd.get("mood")), ratings, how: fd.get("how").trim(), hard: fd.get("hard").trim(), win: fd.get("win").trim() },
+      journal: { mood: Number(fd.get("mood")), level: fd.get("level") || "right", ratings, how: fd.get("how").trim(), hard: fd.get("hard").trim(), win: fd.get("win").trim() },
     });
     const best = recordBestStreak(s);
     if (best) s.goals["_best-streak"] = stamp({ value: best });
@@ -728,8 +778,22 @@ function renderSettings() {
     </section></div></div>`;
 }
 
+// ---------- FIND YOUR LEVEL ----------
+function renderLevel() {
+  const curWeek = Math.floor((nextIndex() % LESSON_COUNT) / 5) + 1;
+  view.innerHTML = `
+    <header class="page-head"><a class="back-link" href="#/">${icon("arrowLeft")} Today</a><p class="eyebrow">Find your level</p><h1 class="display">Start where you actually are.</h1>
+      <p class="lead muted">Skim each week. If you could already do most of it comfortably, skip past it. Pick the first week that looks like a real stretch. Lessons you've done stay in your log, and you can move back any time.</p></header>
+    <div class="weeks">${WEEKS.map((w, i) => `<article class="card week-pick${i + 1 === curWeek ? " current" : ""}" style="--i:${i}">
+      <div class="card-head"><p class="eyebrow">Week ${i + 1}</p>${i + 1 === curWeek ? `<span class="badge today">You're here</span>` : ""}</div>
+      <h3 class="display sm">${esc(w.title)}</h3>
+      <ul>${w.days.map((d) => `<li>${esc(d.t)}</li>`).join("")}</ul>
+      <div class="row between"><span class="small muted">${w.areas.map((a) => AREAS[a]).slice(0, 3).join(" · ")}</span>${i + 1 === curWeek ? "" : `<button class="btn sm ${i + 1 > curWeek ? "primary" : ""}" data-act="place" data-week="${i + 1}">Start here</button>`}</div>
+    </article>`).join("")}</div>`;
+}
+
 // ---------- routing & events ----------
-const ROUTES = { "": renderToday, lesson: renderLesson, tracker: renderTracker, goals: renderGoals, tapes: renderTapes, settings: renderSettings };
+const ROUTES = { "": renderToday, level: renderLevel, lesson: renderLesson, tracker: renderTracker, goals: renderGoals, tapes: renderTapes, settings: renderSettings };
 const currentRoute = () => (location.hash.replace(/^#\/?/, "").split("/")[0]) || "";
 
 function render({ animate = false } = {}) {
@@ -787,6 +851,15 @@ view.addEventListener("click", async (e) => {
       break;
     case "bpm": metro.bpm = Math.min(220, Math.max(30, metro.bpm + Number(el.dataset.d))); $(".bpm output").textContent = metro.bpm; break;
     case "rec": toggleRecord(el); break;
+    case "tuner": metro?.stop(); openTuner(); break;
+    case "place": {
+      const w = Number(el.dataset.week);
+      if (!confirm(`Jump to Week ${w}: ${WEEKS[w - 1].title}? Your next lesson will be Week ${w}, Day 1.`)) return;
+      update((st) => { st.prefs ||= {}; st.prefs.placement = stamp({ value: (w - 1) * 5 - lessonsDone() }); });
+      lessonRun = null; try { sessionStorage.removeItem(LESSON_KEY); } catch {}
+      location.hash = "#/";
+      break;
+    }
     case "retake": if (pendingTake?.url) URL.revokeObjectURL(pendingTake.url); pendingTake = null; renderLesson(); break;
     case "skip-rec": lessonStep(() => { pendingTake = { skipped: true }; lessonRun.step++; }); break;
     case "sound": setSound(!soundOn()); el.innerHTML = icon(soundOn() ? "volume" : "volumeOff"); el.title = soundOn() ? "Mute" : "Unmute"; el.setAttribute("aria-label", soundOn() ? "Mute the strings" : "Unmute the strings"); break;
@@ -850,6 +923,7 @@ view.addEventListener("submit", async (e) => {
 // header wiring
 for (const a of document.querySelectorAll("nav a[data-icon]")) a.insertAdjacentHTML("afterbegin", icon(a.dataset.icon));
 document.getElementById("sync").addEventListener("click", () => { location.hash = "#/settings"; });
+document.getElementById("tuner-btn").addEventListener("click", () => { metro?.stop(); openTuner(); });
 document.getElementById("theme").addEventListener("click", () => {
   const next = effectiveTheme() === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = next;

@@ -1,7 +1,7 @@
 // Milestones grouped into ability tiers. Which ones you see depends on how many lessons
 // you've done, what you've already ticked off, and which area your journal says is weakest.
-import { AREAS } from "./curriculum.js?v=4";
-import { streak } from "./schedule.js?v=4";
+import { AREAS } from "./curriculum.js?v=5";
+import { streak } from "./schedule.js?v=5";
 
 export const TIERS = [
   { name: "Bedroom Player", from: 0 },
@@ -60,7 +60,7 @@ function bestStreak(state) {
 export function context(state) {
   const sessions = Object.values(state.sessions).filter((s) => !s.deleted);
   return {
-    lessons: sessions.filter((s) => s.lesson != null).length,
+    lessons: sessions.filter((s) => s.lesson != null).length + Math.max(0, state.prefs?.placement?.value || 0),
     recordings: sessions.filter((s) => s.recording).length,
     bestStreak: bestStreak(state),
   };
