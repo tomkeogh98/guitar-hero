@@ -8,6 +8,12 @@
   <meta name="theme-color" content="#F3EEE4" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0F0E0C" media="(prefers-color-scheme: dark)">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1.5C18.6 1.5 22.5 5 22.5 9.6C22.5 15.8 15.6 22.5 12 22.5C8.4 22.5 1.5 15.8 1.5 9.6C1.5 5 5.4 1.5 12 1.5Z' fill='%23FF4F1F'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Guitar Hero">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <script>
     // Apply the saved theme before first paint to avoid a flash.
     try { const t = localStorage.getItem("gh.theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
@@ -15,7 +21,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,300..800,0..100,0..1;1,9..144,300..800,0..100,0..1&family=Instrument+Sans:wght@400..700&family=Courier+Prime:wght@400;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=6">
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
   <a class="skip" href="#view">Skip to content</a>
@@ -44,6 +50,6 @@
   <main id="view" tabindex="-1"></main>
   <footer class="foot"><span>Keep it fun.</span> Free play is always allowed.</footer>
   <noscript><p class="card">This notebook needs JavaScript switched on.</p></noscript>
-  <script type="module" src="js/app.js?v=6"></script>
+  <script type="module" src="js/app.js?v=7"></script>
 </body>
 </html>

@@ -1,14 +1,14 @@
-import { AREAS, BLOCKS, LESSON_COUNT, REFERENCE_TABS, WEEKS, getLesson, lessonLabel } from "./curriculum.js?v=6";
-import { greet } from "./greetings.js?v=6";
-import { GOALS, TIERS, context, currentTier, focusGoals, isDone, recordBestStreak, weakestArea } from "./goals.js?v=6";
-import { REASONS, dayStatus, excuseOn, nudgeCheck, practisedOn, sessionsOn, shiftTargets, streak, weekSummary } from "./schedule.js?v=6";
-import { configured, exportJSON, getAudio, importJSON, putAudio, saveSettings, stamp, store, syncNow, testConnection, update } from "./store.js?v=6";
-import { Metronome, chime, extFor, recordingSupported, startRecording } from "./audio.js?v=6";
-import { addDays, daysBetween, dayName, esc, fmt, monthName, mondayOf, parse, pickRandom, prettyDate, reducedMotion, shortDay, today, uid, weekday } from "./util.js?v=6";
-import { icon, moodFace, pick } from "./icons.js?v=6";
-import { countUps, mountStrings, setSound, soundOn, splitWords, stringsMarkup, waveform } from "./fx.js?v=6";
-import { handInfo } from "./hands.js?v=6";
-import { openTuner } from "./tuner.js?v=6";
+import { AREAS, BLOCKS, LESSON_COUNT, REFERENCE_TABS, WEEKS, getLesson, lessonLabel } from "./curriculum.js?v=7";
+import { greet } from "./greetings.js?v=7";
+import { GOALS, TIERS, context, currentTier, focusGoals, isDone, recordBestStreak, weakestArea } from "./goals.js?v=7";
+import { REASONS, dayStatus, excuseOn, nudgeCheck, practisedOn, sessionsOn, shiftTargets, streak, weekSummary } from "./schedule.js?v=7";
+import { configured, exportJSON, getAudio, importJSON, putAudio, saveSettings, stamp, store, syncNow, testConnection, update } from "./store.js?v=7";
+import { Metronome, chime, extFor, recordingSupported, startRecording } from "./audio.js?v=7";
+import { addDays, daysBetween, dayName, esc, fmt, monthName, mondayOf, parse, pickRandom, prettyDate, reducedMotion, shortDay, today, uid, weekday } from "./util.js?v=7";
+import { icon, moodFace, pick } from "./icons.js?v=7";
+import { countUps, mountStrings, setSound, soundOn, splitWords, stringsMarkup, waveform } from "./fx.js?v=7";
+import { handInfo } from "./hands.js?v=7";
+import { openTuner } from "./tuner.js?v=7";
 
 const view = document.getElementById("view");
 const $ = (sel, root = view) => root.querySelector(sel);

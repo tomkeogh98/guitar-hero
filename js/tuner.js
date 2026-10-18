@@ -1,8 +1,8 @@
 // Chromatic guitar tuner: microphone → autocorrelation pitch detection → note + cents.
 // Reference tones use the same plucked-string synth as the strings on Today.
-import { audioCtx } from "./audio.js?v=6";
-import { pluck } from "./fx.js?v=6";
-import { icon } from "./icons.js?v=6";
+import { audioCtx } from "./audio.js?v=7";
+import { pluck } from "./fx.js?v=7";
+import { icon } from "./icons.js?v=7";
 
 const NOTE_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
 const TUNING = [
