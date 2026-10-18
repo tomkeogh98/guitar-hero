@@ -73,6 +73,10 @@ const OVERRIDES = {
   "6-2-x": "slide", "6-2-r": "slide", "6-5-r": "shuffleLicks",
   "7-4-s": "strum", "8-2-w": "strum", "8-3-w": "strum", "9-2-w": "strum", "11-3-w": "strum",
   "10-5-s": "rhythmLead", "11-1-r": "rhythmLead", "12-2-s": "riffSong", "12-3-s": "riffSong", "12-3-rec": "strum", "13-4-x": "strum",
+  // corrections after the October curriculum rewrite
+  "3-5-f": "notes", "4-2-x": "strum", "5-2-w": "alt", "6-3-f": "notes", "7-1-s": "strum",
+  "7-4-r": "alt", "7-4-rec": "alt", "8-1-f": "notes", "9-1-f": "strum", "9-1-rec": "strum", "9-2-f": "strum",
+  "9-3-r": "legato", "9-4-f": "arp", "9-5-f": "strum", "10-2-f": "alt", "10-3-f": "alt", "13-4-x": "none", "13-2-x": "none",
 };
 
 function byRule(key, text) {

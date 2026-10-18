@@ -1,6 +1,6 @@
 // Delight layer: playable strings, plucked-string synthesis, count-ups, waveforms.
-import { audioCtx } from "./audio.js?v=5";
-import { reducedMotion } from "./util.js?v=5";
+import { audioCtx } from "./audio.js?v=6";
+import { reducedMotion } from "./util.js?v=6";
 
 // ---------- sound preference ----------
 const SOUND_KEY = "gh.sound";

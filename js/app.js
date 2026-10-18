@@ -1,14 +1,14 @@
-import { AREAS, BLOCKS, LESSON_COUNT, WEEKS, getLesson, lessonLabel } from "./curriculum.js?v=5";
-import { greet } from "./greetings.js?v=5";
-import { GOALS, TIERS, context, currentTier, focusGoals, isDone, recordBestStreak, weakestArea } from "./goals.js?v=5";
-import { REASONS, dayStatus, excuseOn, nudgeCheck, practisedOn, sessionsOn, shiftTargets, streak, weekSummary } from "./schedule.js?v=5";
-import { configured, exportJSON, getAudio, importJSON, putAudio, saveSettings, stamp, store, syncNow, testConnection, update } from "./store.js?v=5";
-import { Metronome, chime, extFor, recordingSupported, startRecording } from "./audio.js?v=5";
-import { addDays, daysBetween, dayName, esc, fmt, monthName, mondayOf, parse, pickRandom, prettyDate, reducedMotion, shortDay, today, uid, weekday } from "./util.js?v=5";
-import { icon, moodFace, pick } from "./icons.js?v=5";
-import { countUps, mountStrings, setSound, soundOn, splitWords, stringsMarkup, waveform } from "./fx.js?v=5";
-import { handInfo } from "./hands.js?v=5";
-import { openTuner } from "./tuner.js?v=5";
+import { AREAS, BLOCKS, LESSON_COUNT, REFERENCE_TABS, WEEKS, getLesson, lessonLabel } from "./curriculum.js?v=6";
+import { greet } from "./greetings.js?v=6";
+import { GOALS, TIERS, context, currentTier, focusGoals, isDone, recordBestStreak, weakestArea } from "./goals.js?v=6";
+import { REASONS, dayStatus, excuseOn, nudgeCheck, practisedOn, sessionsOn, shiftTargets, streak, weekSummary } from "./schedule.js?v=6";
+import { configured, exportJSON, getAudio, importJSON, putAudio, saveSettings, stamp, store, syncNow, testConnection, update } from "./store.js?v=6";
+import { Metronome, chime, extFor, recordingSupported, startRecording } from "./audio.js?v=6";
+import { addDays, daysBetween, dayName, esc, fmt, monthName, mondayOf, parse, pickRandom, prettyDate, reducedMotion, shortDay, today, uid, weekday } from "./util.js?v=6";
+import { icon, moodFace, pick } from "./icons.js?v=6";
+import { countUps, mountStrings, setSound, soundOn, splitWords, stringsMarkup, waveform } from "./fx.js?v=6";
+import { handInfo } from "./hands.js?v=6";
+import { openTuner } from "./tuner.js?v=6";
 
 const view = document.getElementById("view");
 const $ = (sel, root = view) => root.querySelector(sel);
@@ -112,10 +112,10 @@ function renderToday() {
   const todays = sessionsOn(s, now).filter((x) => x.lesson != null);
   const best = Math.max(str, s.goals["_best-streak"]?.value || 0);
 
-  const timeline = BLOCKS.map((b) => `<span class="seg seg-${b.key}" style="--m:${b.mins}" title="${b.label}: ${b.mins} min"></span>`).join("");
+  const timeline = BLOCKS.map((b) => `<span class="seg seg-${b.key}" style="--m:${lesson.mins[b.key]}" title="${b.label}: ${lesson.mins[b.key]} min"></span>`).join("");
   const setlist = BLOCKS.map((b, i) => `<li class="seg-${b.key}"><span class="n">${pad2(i + 1)}</span>
       <div><b>${b.label}</b>${b.key === "free" ? "" : `<span class="tool-tag t-${handInfo(lesson.week, lesson.day, b.key, lesson.blocks[b.key], "electric").tool}">${handInfo(lesson.week, lesson.day, b.key, lesson.blocks[b.key], "electric").toolLabel}</span>`}<p>${b.key === "free" ? "Anything you like. This is the fun bit." : b.key === "rec" ? esc(lesson.blocks.rec) : esc(firstSentence(lesson.blocks[b.key]))}</p></div>
-      <span class="m">${b.mins}′</span></li>`).join("");
+      <span class="m">${lesson.mins[b.key]}′</span></li>`).join("");
 
   let recap;
   if (!last) recap = `<div class="recap-item wide"><p class="eyebrow">Page one</p><p>Nothing to look back on yet. ${esc(lesson.buildsOn)}</p></div>`;
@@ -274,8 +274,8 @@ function timerCard(mins) {
 function metroCard(bpm) {
   return `<div class="tool metro">
     <p class="eyebrow">${icon("metronome")} Metronome</p>
-    <div class="bpm"><button class="icon-btn" data-act="bpm" data-d="-5" aria-label="Slower">${icon("minus")}</button><output>${bpm}</output><button class="icon-btn" data-act="bpm" data-d="5" aria-label="Faster">${icon("plus")}</button></div>
-    <span class="bpm-label">bpm</span>
+    <div class="bpm"><button class="icon-btn" data-act="bpm" data-d="-5" aria-label="5 bpm slower">${icon("minus")}</button><output tabindex="0" data-bpm-edit title="Double-click to type a tempo · arrow keys for ±1" aria-label="Tempo ${bpm} bpm. Double-click or press Enter to type a tempo; arrow keys change it by 1.">${bpm}</output><button class="icon-btn" data-act="bpm" data-d="5" aria-label="5 bpm faster">${icon("plus")}</button></div>
+    <span class="bpm-label">bpm · double-click to type</span>
     <div class="beats">${"<i></i>".repeat(4)}</div>
     <button class="btn" data-act="metro">${icon("play")} <span>Start click</span></button>
   </div>`;
@@ -307,11 +307,16 @@ function renderLesson() {
   if (step <= BLOCKS.length) {
     const b = BLOCKS[step - 1];
     const text = L.blocks[b.key];
-    const showMetro = ["w", "x", "r", "s"].includes(b.key);
+    const showMetro = ["w", "x", "r", "s", "rec"].includes(b.key);
+    const mins = L.mins[b.key], bpm = L.bpmFor[b.key];
     const h = handInfo(L.week, L.day, b.key, text, guitar);
     const handBar = `<div class="hand-bar t-${h.tool}"><span class="hb-tool">${h.toolIcon === "pick" ? pick("hb-pick") : icon(h.toolIcon)}<b>${h.toolLabel}</b></span><span class="hb-how"><b>${h.label}.</b> ${esc(h.how)}</span></div>`;
     let body = `<p class="block-text">${esc(text)}</p>`;
     if (b.key === "x" && L.tab) body += `<figure class="tab-card"><figcaption class="eyebrow">Tab</figcaption><pre class="tab">${esc(L.tab)}</pre></figure>`;
+    else if (b.key !== "free") {
+      const ref = REFERENCE_TABS.find((r) => r.test.test(text));
+      if (ref) body += `<figure class="tab-card"><figcaption class="eyebrow">Reference · ${ref.name}</figcaption><pre class="tab">${esc(ref.tab)}</pre></figure>`;
+    }
     if (b.key === "x") body += `<aside class="tone"><span class="hand">tone &amp; taste · ${esc(guitar)}</span><p>${esc(L.tone)}</p></aside>`;
     if (b.key === "rec") body = recordBlock(L);
     if (b.key === "free") body = `<p class="block-text">${esc(text)}</p><p class="lead muted">Or ignore that and play whatever makes you grin. That's the whole point of free play.</p>`;
@@ -319,14 +324,14 @@ function renderLesson() {
     view.innerHTML = `<section class="lesson">${head}
       <div class="lesson-body">
         <article class="card block seg-${b.key}">
-          <p class="eyebrow"><span class="step-n">${pad2(step)}</span> ${b.mins} min</p>
+          <p class="eyebrow"><span class="step-n">${pad2(step)}</span> ${mins} min</p>
           <h2 class="display block-title">${b.label}</h2>
           ${handBar}
           ${body}
         </article>
         <aside class="tools">
-          ${b.key !== "rec" ? timerCard(b.mins) : ""}
-          ${showMetro ? metroCard(L.bpm) : ""}
+          ${b.key !== "rec" ? timerCard(mins) : ""}
+          ${showMetro ? metroCard(bpm) : ""}
         </aside>
       </div>
       <footer class="lesson-nav">
@@ -334,7 +339,7 @@ function renderLesson() {
         <button class="btn primary lg" data-act="next" ${b.key === "rec" && !pendingTake?.url ? "data-needs-take" : ""}>${isLast ? "Write it up" : "Next"} ${icon("arrowRight")}</button>
       </footer>
     </section>`;
-    if (showMetro) bindMetro(L.bpm);
+    if (showMetro) bindMetro(bpm);
     return;
   }
 
@@ -409,6 +414,38 @@ function guitarArt(kind) {
   </svg>`;
 }
 
+const BPM_MIN = 30, BPM_MAX = 250;
+function setBpm(v) {
+  if (!metro || !Number.isFinite(v)) return;
+  metro.bpm = Math.min(BPM_MAX, Math.max(BPM_MIN, Math.round(v)));
+  const out = $(".bpm output");
+  if (out && !out.querySelector("input")) out.textContent = metro.bpm;
+  out?.setAttribute("aria-label", `Tempo ${metro.bpm} bpm. Double-click or press Enter to type a tempo; arrow keys change it by 1.`);
+}
+// Double-click the number (or press Enter on it) to type any tempo, e.g. 122.
+function editBpm(out) {
+  if (out.querySelector("input")) return;
+  const before = metro.bpm;
+  out.innerHTML = `<input class="bpm-input" type="number" inputmode="numeric" min="${BPM_MIN}" max="${BPM_MAX}" step="1" value="${before}" aria-label="Type a tempo in bpm">`;
+  const input = out.querySelector("input");
+  input.focus(); input.select();
+  let done = false;
+  const finish = (commit) => {
+    if (done) return;
+    done = true;
+    const v = Number(input.value);
+    out.textContent = before;
+    setBpm(commit && input.value !== "" ? v : before);
+    out.focus();
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    if (e.key === "Escape") { e.preventDefault(); finish(false); }
+    e.stopPropagation();
+  });
+  input.addEventListener("blur", () => finish(true));
+}
+
 function bindMetro(bpm) {
   metro = new Metronome((b) => {
     $$(".beats i").forEach((el, i) => el.classList.toggle("on", i === b));
@@ -419,7 +456,7 @@ function bindMetro(bpm) {
 function recordBlock(L) {
   if (!recordingSupported()) return `<p class="block-text">${esc(L.blocks.rec)}</p><p class="warn">This browser can't record audio. Try Chrome or Safari, or skip this take.</p>`;
   return `<p class="block-text"><b>Record this:</b> ${esc(L.blocks.rec)}</p>
-    <p class="muted">Up to 90 seconds. Count yourself in, play it, done. It becomes evidence of your progress, so no noodling.</p>
+    <p class="muted">Up to ${L.recSecs >= 120 ? `${Math.round(L.recSecs / 60)} minutes` : `${L.recSecs} seconds`}. Count yourself in, play it, done. It becomes evidence of your progress, so no noodling. If the take asks for the click, start the metronome on the right first and keep it running while you record.</p>
     <div class="recorder">
       <button class="rec-btn" data-act="rec" aria-label="Start recording"><span></span></button>
       <div class="live-wave" aria-hidden="true">${"<i></i>".repeat(40)}</div>
@@ -429,16 +466,15 @@ function recordBlock(L) {
     ${pendingTake?.url ? "" : `<button class="link small" data-act="skip-rec">Can't record today? Skip it</button>`}`;
 }
 
-async function toggleRecord(btn) {
+async function toggleRecord(btn, maxSecs = 90) {
   if (recorder) { recorder.stop(); return; }
   try {
     btn.classList.add("live");
     btn.setAttribute("aria-label", "Stop recording");
-    metro?.stop();
     const timeEl = $(".rec-time"), bars = $$(".live-wave i"), levels = new Array(bars.length).fill(0);
     let last = 0;
     recorder = await startRecording({
-      maxSecs: 90,
+      maxSecs,
       onLevel: (v) => {
         const t = performance.now();
         if (t - last < 60) return;
@@ -849,8 +885,8 @@ view.addEventListener("click", async (e) => {
       el.classList.toggle("primary", metro.running);
       if (!metro.running) $$(".beats i").forEach((i) => i.classList.remove("on"));
       break;
-    case "bpm": metro.bpm = Math.min(220, Math.max(30, metro.bpm + Number(el.dataset.d))); $(".bpm output").textContent = metro.bpm; break;
-    case "rec": toggleRecord(el); break;
+    case "bpm": setBpm(metro.bpm + Number(el.dataset.d)); break;
+    case "rec": toggleRecord(el, getLesson(lessonRun.index, lessonRun.guitar || "electric").recSecs); break;
     case "tuner": metro?.stop(); openTuner(); break;
     case "place": {
       const w = Number(el.dataset.week);
@@ -887,6 +923,18 @@ view.addEventListener("click", async (e) => {
       break;
     }
   }
+});
+
+view.addEventListener("dblclick", (e) => {
+  const out = e.target.closest("[data-bpm-edit]");
+  if (out && metro) { e.preventDefault(); editBpm(out); }
+});
+view.addEventListener("keydown", (e) => {
+  const out = e.target.closest?.("[data-bpm-edit]");
+  if (!out || !metro || out.querySelector("input")) return;
+  if (e.key === "ArrowUp" || e.key === "ArrowRight") { e.preventDefault(); setBpm(metro.bpm + 1); }
+  if (e.key === "ArrowDown" || e.key === "ArrowLeft") { e.preventDefault(); setBpm(metro.bpm - 1); }
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); editBpm(out); }
 });
 
 view.addEventListener("change", async (e) => {

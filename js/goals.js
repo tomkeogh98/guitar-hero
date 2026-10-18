@@ -1,7 +1,7 @@
 // Milestones grouped into ability tiers. Which ones you see depends on how many lessons
 // you've done, what you've already ticked off, and which area your journal says is weakest.
-import { AREAS } from "./curriculum.js?v=5";
-import { streak } from "./schedule.js?v=5";
+import { AREAS } from "./curriculum.js?v=6";
+import { streak } from "./schedule.js?v=6";
 
 export const TIERS = [
   { name: "Bedroom Player", from: 0 },
